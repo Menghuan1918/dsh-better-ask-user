@@ -2,6 +2,7 @@
 import { build } from 'esbuild'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { appendFile } from 'node:fs/promises'
+import { basename } from 'node:path'
 
 const PLUGIN_ID = 'dsh-better-ask-user'
 
@@ -14,7 +15,9 @@ const cssModules = {
       const map = {}
       for (const name of names) map[name] = 'bau-' + name
       const css = source.replace(/\.([A-Za-z_][A-Za-z0-9_-]*)/g, (match, name) => map[name] === undefined ? match : '.' + map[name])
-      const id = args.path
+      // Stable across checkout paths so the published bundle carries no absolute
+      // machine paths and style de-duplication survives a move.
+      const id = PLUGIN_ID + '/' + basename(args.path)
       const contents = [
         'const css = ' + JSON.stringify(css) + ';',
         'const id = ' + JSON.stringify(id) + ';',
