@@ -374,16 +374,34 @@ function publishContinuedQuestions(ctx: ClientContext, cards: QuestionCards): ()
  * @param ctx - client root context.
  */
 const SETTINGS_NS = 'better-ask-user-settings'
-const ROW_CONFIG_KEY = 'dsh-better-ask-user#dsh-better-ask-user'
+// Standalone first, then the two Apollo-integration aliases. The Apollo profile
+// inserts the row from its bundle patch, so the Plugins page looks the page up
+// as '@menghuan1918/dsh-apollo#dsh-better-ask-user' (and the legacy alias).
+const ROW_CONFIG_KEYS = Object.freeze([
+  'dsh-better-ask-user#dsh-better-ask-user',
+  '@menghuan1918/dsh-apollo#dsh-better-ask-user',
+  'dsh-apollo#dsh-better-ask-user',
+])
 
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-user-questions: dictionaries')
   ctx.effect(() => ctx.locale.register(SETTINGS_NS, { zh: settingsZh, en: settingsEn } as any), 'better-ask-user: settings dictionaries')
-  ctx.slots.inject('plugins.row.config', () => ctx.slots.register({
-    name: 'plugins.row.config',
-    key: ROW_CONFIG_KEY,
-    locale: SETTINGS_NS,
-  } as any, SettingsEntry as any))
+  ctx.effect(() => ctx.slots.inject('plugins.row.config', () => {
+    const disposers: Array<() => void> = []
+    for (const key of ROW_CONFIG_KEYS) {
+      try {
+        const dispose = ctx.slots.register({
+          name: 'plugins.row.config',
+          key,
+          locale: SETTINGS_NS,
+        } as any, SettingsEntry as any)
+        if (typeof dispose === 'function') disposers.push(dispose)
+      } catch {
+        // A rejected alias must not prevent the other keys from registering.
+      }
+    }
+    return () => { for (const dispose of disposers) dispose() }
+  }), 'better-ask-user: row config page')
   const questionDraftStore = createQuestionDraftStore()
   const registerPendingInteraction = ctx.uiSession.registerPendingInteraction<PendingQuestion>(
     pending => pending.kind === 'plan-review' ? 2 : 1,
