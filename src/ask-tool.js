@@ -19,14 +19,12 @@ function questionRequest(questions, exec) {
       question: question.question,
       ...(question.header !== undefined ? { header: question.header } : {}),
       ...(question.options !== undefined ? {
-        options: question.options.map(option => ({
-          label: option.label,
-          ...(option.description !== undefined ? { description: option.description } : {}),
-        })),
+        options: question.options.map(option => ({ ...option })),
       } : {}),
       ...(question.multi_select !== undefined ? { multiSelect: question.multi_select } : {}),
       ...(question.detail !== undefined ? { detail: question.detail } : {}),
     })),
+    ...(exec.agent !== undefined ? { agent: exec.agent } : {}),
     signal: exec.signal,
   }
 }
@@ -122,6 +120,7 @@ export function createBetterAskTool(ctx, base, readConfig) {
     const waitMs = seconds * 1000
     const result = await userQuestions.askTimed({
       ...questions,
+      agent: exec.agent,
       better: { waitMs, timeoutMode: mode, defaultAnswer },
     }, exec.callId, waitMs)
     if ('pending' in result) {
