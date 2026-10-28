@@ -100,7 +100,11 @@ export function createBetterAskTool(ctx, base, readConfig) {
     const result = await userQuestions.askTimed({
       ...questions,
       agent: exec.agent,
-      better: { waitMs, timeoutMode: mode, defaultAnswer },
+      better: {
+        waitMs,
+        timeoutMode: mode,
+        ...(defaultAnswer !== undefined ? { defaultAnswer } : {}),
+      },
     }, exec.callId, waitMs)
     if ('pending' in result) {
       if (mode === 'default' && defaultAnswer !== undefined) return answerResult(defaultAnswer)

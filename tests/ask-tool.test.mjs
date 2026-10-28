@@ -87,6 +87,13 @@ test('input contract stays official and only the pending branch is added', () =>
   assert.equal(harness.definition.output.schema.oneOf[1].properties.autoSelected, undefined)
 })
 
+test('native timed request stays lossless JSON', async () => {
+  const harness = makeHarness()
+  await harness.definition.execute(args, harness.exec)
+  const better = harness.calls.timed[0].request.better
+  assert.deepEqual(JSON.parse(JSON.stringify(better)), better)
+})
+
 test('native behavior forwards the plugin wait and returns the official pending shape', async () => {
   const harness = makeHarness()
   const result = await harness.definition.execute(args, harness.exec)
