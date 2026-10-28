@@ -164,3 +164,30 @@
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-secondary);
 }
+
+/* Better ask-user: long reply text and narrow screens. */
+.row,
+.summary,
+.text,
+.question,
+.questionText,
+.answer,
+.details {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 720px) {
+  .bubble {
+    max-width: 100%;
+  }
+
+  .labelRow {
+    flex-wrap: wrap;
+  }
+
+  .details {
+    max-width: 100%;
+  }
+}
