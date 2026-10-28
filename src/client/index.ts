@@ -27,6 +27,7 @@ import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { brandString } from '@deepseek-ai/dsh-brand'
 import { createWaterfallRequest, PendingQuestion, type BetterAskConfig, type QuestionRpcChannel } from './contract/slots.ts'
 import { createQuestionDraftStore } from './draft-store.ts'
+import { AskHistoryRow } from './AskHistoryRow.tsx'
 import { QuestionComposer } from './QuestionComposer.tsx'
 import { questionReplyDefinition } from './question-reply.ts'
 import { QuestionReplyView } from './QuestionReplyView.tsx'
@@ -414,6 +415,15 @@ export function apply(ctx: ClientContext): void {
   } satisfies UserQuestionPanels)
   ctx.effect(() => disposePanels, 'ui-user-questions: answer panels')
   ctx.effect(() => publishContinuedQuestions(ctx, cards), 'ui-user-questions: continued questions')
+  ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
+    name: 'tool.call.toolview',
+    key: 'ask_user_question',
+    locale: NS,
+    inject: (sessionId: SessionId) => ({
+      revealPanel: (callId: string) => ctx.get('userQuestionPanels')?.reveal(sessionId, callId) ?? false,
+      reviewPanel: (callId: string, record: UserQuestionRecord) => ctx.get('userQuestionPanels')?.review(sessionId, callId, record) ?? false,
+    }),
+  }, AskHistoryRow))
   ctx.slots.inject('conversation.composer', () => ctx.slots.register(
     {
       name: 'conversation.composer',

@@ -1,6 +1,7 @@
 /** Built-closure and carrier behavior tests. */
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
 
 let entry
@@ -53,6 +54,13 @@ function harness(settings) {
   pending.attachWaterfall(channel)
   return { pending, channel, get resolved() { return resolved }, get rejected() { return rejected } }
 }
+
+test('bundle registers the ask history row for top-level and nested calls', async () => {
+  const source = await readFile(new URL('../lib/client.js', import.meta.url), 'utf8')
+  assert.match(source, /tool\.call\.toolview/)
+  assert.match(source, /ask_user_question/)
+  assert.match(source, /history\.review/)
+})
 
 test('input bump resets the countdown to the configured window', () => {
   const h = harness({ waitMs: 5000, timeoutMode: 'native' })
