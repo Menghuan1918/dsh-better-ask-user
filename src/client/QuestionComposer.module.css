@@ -481,3 +481,114 @@
     transition: none;
   }
 }
+
+/* ── Better ask-user adaptations: markdown / long text / narrow screens ── */
+.title,
+.eyebrow,
+.optionLabel,
+.description {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.title {
+  max-height: 30vh;
+  overflow-y: auto;
+}
+
+.title > div,
+.eyebrow > div,
+.optionLabel > div,
+.description > div {
+  margin: 0;
+}
+
+.optionLabel {
+  display: block;
+}
+
+.description {
+  display: block;
+}
+
+.card {
+  max-height: min(75vh, 640px);
+  max-height: min(75dvh, 640px);
+}
+
+.frame {
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+
+@media (max-width: 720px) {
+  .header {
+    flex-wrap: wrap;
+  }
+
+  .headingBlock {
+    flex: 1 1 100%;
+  }
+
+  .headerActions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    margin-left: auto;
+  }
+
+  .waitStatus {
+    white-space: normal;
+  }
+
+  .card {
+    max-height: calc(100vh - 160px);
+    max-height: calc(100dvh - 160px);
+  }
+
+  .title {
+    max-height: 24vh;
+    max-height: 24dvh;
+    font-size: 15px;
+    line-height: 21px;
+  }
+
+  .footer {
+    flex-wrap: wrap;
+  }
+
+  .feedback {
+    flex: 1 1 100%;
+    text-align: left;
+  }
+
+  .footerActions {
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+
+  .option,
+  .customRow {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 420px) {
+  .footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pager {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .footerActions {
+    width: 100%;
+  }
+
+  .footerActions > button {
+    flex: 1 1 auto;
+  }
+}

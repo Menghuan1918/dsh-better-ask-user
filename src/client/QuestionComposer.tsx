@@ -218,10 +218,12 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
   useEffect(() => {
     actions.prune(pending.liveKeys())
   }, [actions, pending])
+  // Only the explicit takeTime choice is persisted. Input extension lives on
+  // the carrier and resets the live deadline; it is not a draft-store state.
   const waitDisposition = useRef<'editing' | 'waiting' | undefined>(restoredWait)
   useEffect(() => {
     if (waitDisposition.current === 'waiting') pending.takeTime()
-    if (waitDisposition.current === 'editing') pending.engage()
+    if (waitDisposition.current === 'editing') pending.bump()
   }, [pending])
   // The countdown belongs to the carrier, not to this component: the user can
   // close the panel and reopen it from the tool call row, and a timer that died
@@ -243,6 +245,10 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
   const hasOptions = (question.options?.length ?? 0) > 0
 
   const replaceProgress = (nextIndex: number, nextDrafts: QuestionDraftAnswer[]): void => {
+    // Every real answer input (option click, text edit, page navigation, skip)
+    // resets the foreground countdown to the configured wait. takeTime sets
+    // held first, so this bump is a no-op for the explicit stop choice.
+    pending.bump()
     actions.replace(pending.key, {
       index: nextIndex,
       drafts: nextDrafts,
@@ -256,12 +262,6 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
     replaceProgress(index, drafts)
   }
 
-  const engage = (): void => {
-    if (waitDisposition.current !== undefined) return
-    waitDisposition.current = 'editing'
-    pending.engage()
-  }
-
   const focusAnswerSurface = (event: FocusEvent<HTMLDivElement>): void => {
     if (!event.currentTarget.contains(event.relatedTarget)) pending.holdFocus()
   }
@@ -273,10 +273,6 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
   useEffect(() => {
     const release = (): void => { pending.releaseFocus() }
     const refocus = (): void => {
-      if (waitDisposition.current === 'editing') {
-        pending.engage()
-        return
-      }
       if (answerSurface.current?.contains(document.activeElement) === true) pending.holdFocus()
     }
     const visibilityChanged = (): void => { if (document.hidden) release(); else refocus() }
@@ -317,7 +313,6 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
     update: (current: QuestionDraftAnswer) => QuestionDraftAnswer,
     nextIndex = index,
   ): void => {
-    engage()
     const nextDrafts = drafts.map((item, itemIndex) => itemIndex === index ? update(item) : item)
     replaceProgress(nextIndex, nextDrafts)
     setError(null)
@@ -417,7 +412,6 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
   }
 
   const skipQuestion = (): void => {
-    engage()
     const nextDrafts = drafts.map((item, itemIndex) => itemIndex === index
       ? { selected: [], custom: '', skipped: true }
       : item)
@@ -437,10 +431,19 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
       >
         <header className={css.header}>
           <div className={css.headingBlock}>
-            {question.header !== undefined && <div className={css.eyebrow}>{question.header}</div>}
-            <h2 className={css.title} id={`question-${pending.key}-${String(index)}`}>
-              {question.question}
-            </h2>
+            {question.header !== undefined && (
+              <div className={css.eyebrow}>
+                <MarkdownText text={question.header} variant="compact" labels={markdownLabels} />
+              </div>
+            )}
+            <div
+              className={css.title}
+              id={`question-${pending.key}-${String(index)}`}
+              role="heading"
+              aria-level={2}
+            >
+              <MarkdownText text={question.question} variant="compact" labels={markdownLabels} />
+            </div>
           </div>
           <div className={css.headerActions}>
             {countdown !== undefined && card.waitState !== 'waiting' && card.waitState !== 'editing' && card.waitState !== 'continued' && (
@@ -448,6 +451,11 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
                 {t(countdown.running ? 'wait.countdown' : 'wait.paused', {
                   seconds: Math.ceil(countdown.remainingMs / 1000),
                 })}
+              </span>
+            )}
+            {countdown !== undefined && card.waitState !== 'waiting' && card.waitState !== 'editing' && card.waitState !== 'continued' && (
+              <span className={css.waitStatus}>
+                {t(card.timeoutMode === 'default' ? 'wait.auto' : 'wait.extend')}
               </span>
             )}
             {countdown !== undefined && card.waitState !== 'waiting' && card.waitState !== 'editing' && card.waitState !== 'continued' && (
@@ -523,12 +531,16 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
                         : <span className={css.number}>{optionIndex + 1}</span>}
                       <span className={css.optionCopy}>
                         <span className={css.optionLine}>
-                          <span className={css.optionLabel}>{display.label}</span>
+                          <span className={css.optionLabel}>
+                            <MarkdownText text={display.label} variant="compact" labels={markdownLabels} />
+                          </span>
                           {display.recommended && (
                             <span className={css.badge}>{t('option.recommended')}</span>
                           )}
                           {option.description !== undefined && (
-                            <span className={css.description}>{option.description}</span>
+                            <span className={css.description}>
+                              <MarkdownText text={option.description} variant="compact" labels={markdownLabels} />
+                            </span>
                           )}
                         </span>
                       </span>

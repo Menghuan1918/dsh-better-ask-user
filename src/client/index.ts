@@ -25,12 +25,14 @@ import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type { UserQuestionPanels, UserQuestionRecord } from '@deepseek-ai/dsh-client-ui-tool/client'
 import type { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { brandString } from '@deepseek-ai/dsh-brand'
-import { createWaterfallRequest, PendingQuestion, type QuestionRpcChannel } from './contract/slots.ts'
+import { createWaterfallRequest, PendingQuestion, type BetterAskConfig, type QuestionRpcChannel } from './contract/slots.ts'
 import { createQuestionDraftStore } from './draft-store.ts'
 import { QuestionComposer } from './QuestionComposer.tsx'
 import { questionReplyDefinition } from './question-reply.ts'
 import { QuestionReplyView } from './QuestionReplyView.tsx'
 import { en, zh, type QuestionKey } from './locales.ts'
+import { SettingsEntry } from './settings.tsx'
+import { settingsEn, settingsZh } from './settings-locales.ts'
 
 export type {
   PendingQuestion, PlanReview, QuestionAnswer, QuestionComposerProps, QuestionWait,
@@ -106,12 +108,17 @@ class QuestionCards {
    * Return the card of a tool call, creating and publishing it when absent.
    * A request without a call id always gets a fresh card.
    */
-  ensure(sessionId: SessionId, questions: readonly AskUserQuestionItem[], callId: ToolCallId | undefined): QuestionCard {
+  ensure(
+    sessionId: SessionId,
+    questions: readonly AskUserQuestionItem[],
+    callId: ToolCallId | undefined,
+    settings?: BetterAskConfig,
+  ): QuestionCard {
     if (callId !== undefined) {
       const existing = this.byCallId(sessionId, callId)
       if (existing !== undefined) return existing
     }
-    return this.#create(new PendingQuestion(sessionId, questions, callId, () => this.keysFor(sessionId)))
+    return this.#create(new PendingQuestion(sessionId, questions, callId, () => this.keysFor(sessionId), undefined, settings))
   }
 
   /** Publish one carrier into the composer seat and register the card that owns it. */
@@ -215,7 +222,8 @@ async function answerQuestion(
   const sessionId = ctx.sessions.scopeOf(owner)
   if (sessionId === undefined) return next()
   const callId = request.wait?.callId
-  const card = cards.ensure(sessionId, request.questions, callId)
+  const better = (request as { better?: BetterAskConfig }).better
+  const card = cards.ensure(sessionId, request.questions, callId, better)
   const claimLifetime = new AbortController()
   const claimSignal = request.signal === undefined ? claimLifetime.signal
     : AbortSignal.any([claimLifetime.signal, request.signal])
@@ -365,8 +373,17 @@ function publishContinuedQuestions(ctx: ClientContext, cards: QuestionCards): ()
  * the standard locale seat.
  * @param ctx - client root context.
  */
+const SETTINGS_NS = 'better-ask-user-settings'
+const ROW_CONFIG_KEY = 'dsh-better-ask-user#dsh-better-ask-user'
+
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-user-questions: dictionaries')
+  ctx.effect(() => ctx.locale.register(SETTINGS_NS, { zh: settingsZh, en: settingsEn } as any), 'better-ask-user: settings dictionaries')
+  ctx.slots.inject('plugins.row.config', () => ctx.slots.register({
+    name: 'plugins.row.config',
+    key: ROW_CONFIG_KEY,
+    locale: SETTINGS_NS,
+  } as any, SettingsEntry as any))
   const questionDraftStore = createQuestionDraftStore()
   const registerPendingInteraction = ctx.uiSession.registerPendingInteraction<PendingQuestion>(
     pending => pending.kind === 'plan-review' ? 2 : 1,
@@ -401,3 +418,6 @@ export function apply(ctx: ClientContext): void {
     return answerQuestion(ctx, this, request, next, cards)
   })
 }
+
+// Exported for the built-closure behavior tests; the client loader ignores it.
+export { PendingQuestion }

@@ -23,7 +23,20 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 /** One structured answer batch covering every question of the request. */
-export type QuestionAnswer = AskUserQuestionAnswer
+export type QuestionAnswer = AskUserQuestionAnswer & {
+  /** True when the host selected default options after the wait expired. */
+  autoSelected?: true
+}
+
+/** Host-provided timing policy for one question card. */
+export interface BetterAskConfig {
+  /** Input-extension window in milliseconds. */
+  readonly waitMs?: number
+  /** Timeout behavior for this card. */
+  readonly timeoutMode?: 'native' | 'default'
+  /** Host-authored default answer used by default mode. */
+  readonly defaultAnswer?: QuestionAnswer
+}
 
 /** One question of the request. */
 type QuestionItem = AskUserQuestionItem
@@ -216,6 +229,10 @@ export interface QuestionCardSnapshot {
   readonly channel: 'waterfall' | 'rpc' | 'none'
   /** Set once the card left the registry; the mounted composer clears its draft on this. */
   readonly closed: boolean
+  /** Configured input-extension window, when the host supplied one. */
+  readonly waitMs?: number
+  /** Host-selected timeout behavior, when the host supplied one. */
+  readonly timeoutMode?: 'native' | 'default'
 }
 
 /**
@@ -264,6 +281,9 @@ export class PendingQuestion {
   readonly #siblings: (() => readonly string[]) | undefined
   readonly #listeners = new Set<() => void>()
   #snapshot: QuestionCardSnapshot
+  #waitMs: number | undefined
+  #timeoutMode: 'native' | 'default' = 'native'
+  #defaultAnswer: QuestionAnswer | undefined
 
   /**
    * @param sessionId - Agent/Session identity owning the request.
@@ -278,9 +298,13 @@ export class PendingQuestion {
     callId?: ToolCallId,
     siblings?: () => readonly string[],
     review?: readonly AskUserQuestionAnswerItem[],
+    settings?: BetterAskConfig,
   ) {
     this.sessionId = sessionId
     this.questions = questions
+    this.#waitMs = settings?.waitMs
+    this.#timeoutMode = settings?.timeoutMode ?? 'native'
+    this.#defaultAnswer = settings?.defaultAnswer
     this.kind = planReviewOf(questions) === undefined ? 'question' : 'plan-review'
     this.callId = callId
     this.review = review
@@ -347,6 +371,7 @@ export class PendingQuestion {
         : undefined,
       channel,
       closed: this.#closed,
+      ...(this.#timedWait ? { waitMs: this.#waitMs, timeoutMode: this.#timeoutMode } : {}),
     }
   }
 
@@ -496,9 +521,45 @@ export class PendingQuestion {
     this.publish()
   }
 
-  /** Local countdown reached zero: settle the waterfall with `ASK_TIMED_OUT`, keep the card. */
+  /**
+   * Extend the foreground countdown to the configured window. Called on every
+   * real answer input (option click, text edit, page navigation, skip).
+   * @param now - current Client epoch time.
+   */
+  bump(now = Date.now()): void {
+    if (this.#waitMs === undefined || !this.#timedWait || this.#held) return
+    if (this.#waterfall === undefined || this.#closed) return
+    this.#focused = false
+    this.#engaged = false
+    this.#remainingMs = undefined
+    this.#deadline = now + this.#waitMs
+    this.publish()
+  }
+
+  /** Settle with the host-authored default answer in default timeout mode. */
+  autoSelect(): void {
+    if (this.#held || this.#engaged || this.#focused) return
+    const channel = this.#waterfall
+    if (channel === undefined) return
+    const answer = this.#defaultAnswer
+    if (this.#timeoutMode !== 'default' || answer === undefined) {
+      this.timeout()
+      return
+    }
+    this.#waterfall = undefined
+    this.#timedWait = false
+    this.#deadline = undefined
+    channel.resolve(answer)
+    this.publish()
+  }
+
+  /** Local countdown reached zero: default-select or settle with `ASK_TIMED_OUT`. */
   timeout(): void {
     if (this.#held || this.#engaged || this.#focused) return
+    if (this.#timeoutMode === 'default' && this.#defaultAnswer !== undefined) {
+      this.autoSelect()
+      return
+    }
     const channel = this.#waterfall
     if (channel === undefined) return
     this.#waterfall = undefined

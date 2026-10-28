@@ -2,7 +2,7 @@
 import { Config, readConfig as snapshotConfig } from './config.js'
 import { createBetterAskTool } from './ask-tool.js'
 import { mountPtcExemption } from './ptc.js'
-import { mountSettings } from './settings.js'
+import { mountLegacyMigration, mountSettings } from './settings.js'
 
 export { Config }
 export const name = 'dsh-better-ask-user'
@@ -11,6 +11,7 @@ export const inject = ['agents', 'tools', 'userQuestions']
 export function apply(ctx, config = {}) {
   const readConfig = () => snapshotConfig(config)
   mountSettings(ctx)
+  mountLegacyMigration(ctx)
   mountPtcExemption(ctx)
 
   const states = new Map()

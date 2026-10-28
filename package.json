@@ -19,6 +19,7 @@
     "dsh": ">=0.2.1-rc.2 <0.3.0"
   },
   "scripts": {
+    "pretest": "node scripts/build-client.mjs",
     "test": "node --test",
     "build": "node scripts/build-client.mjs"
   },
@@ -55,7 +56,8 @@
         "@deepseek-ai/dsh-client-ui-conversation",
         "@deepseek-ai/dsh-client-ui-renderer",
         "@deepseek-ai/dsh-client-ui-session",
-        "@deepseek-ai/dsh-client-ui-chat"
+        "@deepseek-ai/dsh-client-ui-chat",
+        "@deepseek-ai/dsh-client-ui-settings"
       ]
     }
   },

@@ -1,0 +1,53 @@
+/** Settings-page dictionaries. */
+
+export const settingsZh = {
+  summary: '提问等待、输入续期与超时行为',
+  title: '提问设置',
+  intro: '控制 ask_user_question 的等待时长、输入续期和超时行为；修改后对之后开始的提问生效。',
+  waitLabel: '等待时长（秒）',
+  waitHint: '-1 表示不超时；其他值为 1 到 2147483。卡片内每次真实输入都会从该时长重新计时。',
+  behaviorLabel: '普通会话超时行为',
+  goalBehaviorLabel: 'Goal 活跃时的超时行为',
+  native: '原生 pending',
+  default: '超时后默认选择',
+  nativeHint: '到点后返回官方的 pending 结果，用户仍可稍后回答。',
+  defaultHint: '到点后按规则选择默认项，并明确标记为自动选择而非用户回答。',
+  readonly: '当前配置为只读。',
+  loading: '正在读取设置…',
+  unavailable: '当前连接下该配置不可用。',
+  waiting: '正在等待宿主提供这一行的配置…',
+  invalidWait: '等待时长必须是 -1 或 1 到 2147483 的整数。',
+  save: '保存',
+  saving: '保存中…',
+  saved: '已保存。',
+  conflict: '设置已被其他窗口修改，请重试。',
+  saveFailed: '保存失败：',
+  dirty: '有未保存的修改',
+} satisfies Record<string, string>
+
+export type SettingsKey = keyof typeof settingsZh
+
+export const settingsEn = {
+  summary: 'Question wait, input extension and timeout behavior',
+  title: 'Question settings',
+  intro: 'Controls the wait, input extension and timeout behavior for ask_user_question. Changes apply to questions started afterwards.',
+  waitLabel: 'Wait duration (seconds)',
+  waitHint: '-1 never times out; otherwise 1 to 2147483. Every real input in the card restarts this window.',
+  behaviorLabel: 'Inactive-session timeout behavior',
+  goalBehaviorLabel: 'Goal-active timeout behavior',
+  native: 'Native pending',
+  default: 'Default selection at timeout',
+  nativeHint: 'Return the official pending result; the user can still answer later.',
+  defaultHint: 'Select defaults by rule at timeout and mark the result as auto-selected, not a user answer.',
+  readonly: 'This configuration is read-only.',
+  loading: 'Loading settings…',
+  unavailable: 'This configuration is unavailable on the current connection.',
+  waiting: 'Waiting for the host configuration snapshot…',
+  invalidWait: 'The wait must be -1 or an integer from 1 to 2147483.',
+  save: 'Save',
+  saving: 'Saving…',
+  saved: 'Saved.',
+  conflict: 'The settings changed in another window; try again.',
+  saveFailed: 'Save failed: ',
+  dirty: 'Unsaved changes',
+} satisfies Record<SettingsKey, string>
