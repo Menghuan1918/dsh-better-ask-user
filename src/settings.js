@@ -12,9 +12,11 @@ function hasOwn(value, key) {
   return value !== null && typeof value === 'object' && Object.hasOwn(value, key)
 }
 
-function descriptor(service, ns) {
+async function descriptor(service, ns) {
   try {
-    return service.describe(ns)
+    const rows = await service.describe()
+    if (!Array.isArray(rows)) return undefined
+    return rows.find(row => row?.ns === ns)
   } catch {
     return undefined
   }
@@ -36,25 +38,25 @@ export async function migrateLegacyQuestionTimeout(service) {
     return { status: 'unavailable' }
   }
   const deadline = Date.now() + WAIT_MS
-  let source = descriptor(service, LEGACY_GOAL_NS)
-  let target = descriptor(service, ASK_NS)
+  let source = await descriptor(service, LEGACY_GOAL_NS)
+  let target = await descriptor(service, ASK_NS)
   while ((source === undefined || target === undefined) && Date.now() < deadline) {
     await sleep(WAIT_INTERVAL_MS)
-    source = descriptor(service, LEGACY_GOAL_NS)
-    target = descriptor(service, ASK_NS)
+    source = await descriptor(service, LEGACY_GOAL_NS)
+    target = await descriptor(service, ASK_NS)
   }
   if (source === undefined || target === undefined) return { status: 'pending' }
   if (!hasOwn(source.user, 'questionTimeoutSeconds')) return { status: 'no-change' }
   if (hasOwn(target.user, 'questionTimeoutSeconds')) return { status: 'no-change' }
   const value = source.value?.questionTimeoutSeconds
   if (!validSeconds(value)) return { status: 'no-change' }
-  if (target.writable !== true) return { status: 'pending' }
+  if (service.writable === false) return { status: 'pending' }
   try {
     await service.update(ASK_NS, { questionTimeoutSeconds: value }, target.revision)
   } catch (error) {
     return { status: 'error', error: error instanceof Error ? error.message : String(error) }
   }
-  const after = descriptor(service, ASK_NS)
+  const after = await descriptor(service, ASK_NS)
   return after?.user?.questionTimeoutSeconds === value
     ? { status: 'complete', value }
     : { status: 'pending', value }

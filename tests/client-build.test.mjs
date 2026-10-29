@@ -62,6 +62,12 @@ test('bundle registers the ask history row for top-level and nested calls', asyn
   assert.match(source, /history\.review/)
 })
 
+test('history row uses an icon exported by DSH 0.2.1 primitives', async () => {
+  const source = await readFile(new URL('../lib/client.js', import.meta.url), 'utf8')
+  assert.doesNotMatch(source, /IconQuestionOutline14/)
+  assert.match(source, /IconQuestionOutlineRegular/)
+})
+
 test('input bump resets the countdown to the configured window', () => {
   const h = harness({ waitMs: 5000, timeoutMode: 'native' })
   assert.equal(h.pending.snapshot().waitMs, 5000)

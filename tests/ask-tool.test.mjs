@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { createBetterAskTool } from '../src/ask-tool.js'
+import { AUTO_SELECTED_WARNING, createBetterAskTool } from '../src/ask-tool.js'
 
 const base = {
   name: 'ask_user_question',
@@ -76,13 +76,15 @@ function makeHarness({ goal, config, timed = { pending: true, callId: 'c1' }, as
   return { definition, exec, calls }
 }
 
-test('input contract stays official and only the pending branch is added', () => {
+test('input contract keeps official fields and exposes optional detail', () => {
   const harness = makeHarness()
   assert.equal(harness.definition.name, base.name)
   assert.equal(harness.definition.description, base.description)
-  assert.deepEqual(harness.definition.parameters, base.parameters)
+  assert.equal(harness.definition.parameters.properties.questions.items.properties.detail.type, 'string')
+  assert.equal(base.parameters.properties.questions.items.properties.detail, undefined, 'base schema must not be mutated')
   assert.equal(harness.definition.parameters.properties.timeout, undefined)
-  assert.deepEqual(harness.definition.output.schema.oneOf[0], base.output.schema)
+  assert.equal(harness.definition.output.schema.oneOf[0].properties.autoSelected.type, 'boolean')
+  assert.equal(harness.definition.output.schema.oneOf[0].properties.warning.type, 'string')
   assert.equal(harness.definition.output.schema.oneOf[1].properties.pending.type, 'boolean')
   assert.equal(harness.definition.output.schema.oneOf[1].properties.autoSelected, undefined)
 })
@@ -92,6 +94,17 @@ test('native timed request stays lossless JSON', async () => {
   await harness.definition.execute(args, harness.exec)
   const better = harness.calls.timed[0].request.better
   assert.deepEqual(JSON.parse(JSON.stringify(better)), better)
+})
+
+test('question detail is forwarded and validated as a string', async () => {
+  const harness = makeHarness()
+  const withDetail = { questions: [{ id: 'one', question: 'One?', detail: 'Plan body with **markdown**' }] }
+  await harness.definition.execute(withDetail, harness.exec)
+  assert.equal(harness.calls.timed[0].request.questions[0].detail, 'Plan body with **markdown**')
+  await assert.rejects(
+    () => harness.definition.execute({ questions: [{ id: 'one', question: 'One?', detail: 7 }] }, harness.exec),
+    /detail/,
+  )
 })
 
 test('native behavior forwards the plugin wait and returns the official pending shape', async () => {
@@ -117,6 +130,8 @@ test('default behavior backstops the plugin wait with the default batch', async 
       { id: 'multi', selected: ['Y (Recommended)'] },
       { id: 'none', selected: [] },
     ],
+    autoSelected: true,
+    warning: AUTO_SELECTED_WARNING,
   })
   const better = harness.calls.timed[0].request.better
   assert.deepEqual(better.defaultAnswer, result)
@@ -143,7 +158,7 @@ test('disabled wait uses the plain ask path with the official call id', async ()
   assert.equal(harness.calls.timed.length, 0)
 })
 
-test('a client auto answer is reduced to the official answers shape', async () => {
+test('a client auto answer keeps the autoSelected warning', async () => {
   const auto = {
     answers: [
       { id: 'one', selected: ['A'] },
@@ -160,8 +175,9 @@ test('a client auto answer is reduced to the official answers shape', async () =
       { id: 'multi', selected: ['X'] },
       { id: 'none', selected: [] },
     ],
+    autoSelected: true,
+    warning: AUTO_SELECTED_WARNING,
   })
-  assert.equal('autoSelected' in result, false)
   assert.deepEqual(harness.definition.output.render(args, result), [{ type: 'text', text: 'base' }])
 })
 

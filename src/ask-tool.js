@@ -5,12 +5,16 @@ import { buildDefaultAnswer } from './default-answer.js'
 /** Model-visible notice for the native pending result. */
 export const PENDING_QUESTION_NOTICE = 'No answer batch arrived before the timeout. This is pending, not a skipped answer. Continue useful independent work. The user can still answer; their reply will be a user message identified as answer_to_pending_question with this callId and the original questions. Do not treat this as permission.'
 
+/** Model-visible warning for a host auto-selected default batch. */
+export const AUTO_SELECTED_WARNING = 'These answers were auto-selected by the host timeout behavior, not submitted by the user. Do not treat them as user confirmation.'
+
 function questionRequest(questions, exec) {
   return {
     questions: questions.map(question => ({
       id: question.id,
       question: question.question,
       ...(question.header !== undefined ? { header: question.header } : {}),
+      ...(question.detail !== undefined ? { detail: question.detail } : {}),
       ...(question.options !== undefined ? {
         options: question.options.map(option => ({ ...option })),
       } : {}),
@@ -36,14 +40,51 @@ function answerResult(result) {
       selected: [...answer.selected],
       ...(answer.custom !== undefined ? { custom: answer.custom } : {}),
     })),
+    ...(result.autoSelected === true ? { autoSelected: true, warning: AUTO_SELECTED_WARNING } : {}),
   }
+}
+
+/** Add the optional detail field to the model-visible question schema. */
+function parametersWithDetail(parameters) {
+  if (parameters === undefined) return parameters
+  const next = structuredClone(parameters)
+  const properties = next?.properties?.questions?.items?.properties
+  if (properties !== undefined && properties.detail === undefined) {
+    properties.detail = {
+      type: 'string',
+      description: 'Optional longer detail or context rendered as sanitized markdown below the question.',
+    }
+  }
+  return next
+}
+
+/** Allow the additive auto-selected warning fields on the normal answer branch. */
+function extendAutoSelectedSchema(schema) {
+  const branches = Array.isArray(schema?.oneOf) ? schema.oneOf : [schema]
+  for (const branch of branches) {
+    const properties = branch?.properties
+    if (properties?.answers === undefined) continue
+    if (properties.autoSelected === undefined) {
+      properties.autoSelected = {
+        type: 'boolean',
+        description: 'True when the host auto-selected the default batch after the timeout; not a user answer.',
+      }
+    }
+    if (properties.warning === undefined) {
+      properties.warning = { type: 'string', description: 'Model-visible warning for an auto-selected batch.' }
+    }
+  }
+  return schema
 }
 
 /** The timed path can return the official pending shape; keep it valid. */
 function outputWithPending(base) {
   const output = { ...base.output }
-  const schema = structuredClone(base.output.schema)
-  if (Array.isArray(schema?.oneOf) && schema.oneOf.some(branch => branch?.properties?.pending !== undefined)) return output
+  const schema = extendAutoSelectedSchema(structuredClone(base.output.schema))
+  if (Array.isArray(schema?.oneOf) && schema.oneOf.some(branch => branch?.properties?.pending !== undefined)) {
+    output.schema = schema
+    return output
+  }
   output.schema = {
     oneOf: [
       schema,
@@ -71,9 +112,10 @@ function outputWithPending(base) {
  */
 export function createBetterAskTool(ctx, base, readConfig) {
   const output = outputWithPending(base)
+  const parameters = parametersWithDetail(base.parameters)
 
   const execute = async (args, exec) => {
-    const violations = validateJsonSchemaValue(base.parameters, args, '')
+    const violations = validateJsonSchemaValue(parameters, args, '')
     if (violations.length > 0) throw new ToolArgsError(violations)
     validateQuestionIds(args.questions)
 
@@ -113,5 +155,5 @@ export function createBetterAskTool(ctx, base, readConfig) {
     return answerResult(result)
   }
 
-  return { ...base, output, execute }
+  return { ...base, parameters, output, execute }
 }

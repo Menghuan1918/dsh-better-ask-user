@@ -1,5 +1,5 @@
 /** History row for ask_user_question: compact summary plus a replay button. */
-import { IconQuestionOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconQuestionOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps, UserQuestionRecord } from '@deepseek-ai/dsh-client-ui-tool/client'
 import type { AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions/types'
@@ -116,7 +116,7 @@ export function AskHistoryRow({
 
   return (
     <div className={css.row}>
-      <span className={css.icon} aria-hidden="true"><IconQuestionOutline14 /></span>
+      <span className={css.icon} aria-hidden="true"><IconQuestionOutlineRegular /></span>
       <span className={css.title}>{t('history.title')}</span>
       <span className={css.summary} title={summary}>{summary}</span>
       {action !== undefined && (

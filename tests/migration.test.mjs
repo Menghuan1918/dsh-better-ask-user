@@ -3,25 +3,24 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { ASK_NS, LEGACY_GOAL_NS, migrateLegacyQuestionTimeout } from '../src/settings.js'
 
-function harness({ sourceUser = { questionTimeoutSeconds: -1 }, targetUser = {}, sourceValue = -1, writable = true } = {}) {
+function harness({ sourceUser = { questionTimeoutSeconds: -1 }, targetUser = {}, sourceValue = -1, writable = true, targetFirst = false, asyncDescribe = false } = {}) {
   const calls = []
   const source = {
+    ns: LEGACY_GOAL_NS,
     value: { questionTimeoutSeconds: sourceValue },
     user: sourceUser,
     revision: 1,
   }
   const target = {
+    ns: ASK_NS,
     value: { questionTimeoutSeconds: 120 },
     user: targetUser,
     revision: 7,
-    writable,
   }
+  const rows = targetFirst ? [target, source] : [source, target]
   const service = {
-    describe(ns) {
-      if (ns === LEGACY_GOAL_NS) return source
-      if (ns === ASK_NS) return target
-      return undefined
-    },
+    writable,
+    describe: asyncDescribe ? async () => rows : () => rows,
     async update(ns, patch, revision) {
       calls.push({ ns, patch, revision })
       target.user = { ...target.user, ...patch }
@@ -65,6 +64,13 @@ test('a read-only target stays pending without writing', async () => {
   const result = await migrateLegacyQuestionTimeout(h.service)
   assert.deepEqual(result, { status: 'pending' })
   assert.equal(h.calls.length, 0)
+})
+
+test('array rows in either order and an async describe are supported', async () => {
+  const h = harness({ targetFirst: true, asyncDescribe: true })
+  const result = await migrateLegacyQuestionTimeout(h.service)
+  assert.deepEqual(result, { status: 'complete', value: -1 })
+  assert.deepEqual(h.calls, [{ ns: ASK_NS, patch: { questionTimeoutSeconds: -1 }, revision: 7 }])
 })
 
 test('an unavailable settings service is a safe no-op', async () => {
