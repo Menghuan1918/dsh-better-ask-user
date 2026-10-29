@@ -419,6 +419,11 @@ export function apply(ctx: ClientContext): void {
     name: 'tool.call.toolview',
     key: 'ask_user_question',
     locale: NS,
+    // The shipped `@deepseek-ai/dsh-client-ui-tool` already registers
+    // `ask-question-toolview` for this key at priority 0, and the slot registry
+    // rejects a second entry at the same priority (which failed the whole client
+    // boot). A lower priority shadows it: lowest renders.
+    priority: -1,
     inject: (sessionId: SessionId) => ({
       revealPanel: (callId: string) => ctx.get('userQuestionPanels')?.reveal(sessionId, callId) ?? false,
       reviewPanel: (callId: string, record: UserQuestionRecord) => ctx.get('userQuestionPanels')?.review(sessionId, callId, record) ?? false,
