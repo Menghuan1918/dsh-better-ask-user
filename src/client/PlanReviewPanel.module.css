@@ -13,7 +13,8 @@
   max-height: min(75vh, 640px);
   max-height: min(75dvh, 640px);
   overflow: hidden;
-  border: 0.5px solid var(--dsw-alias-border-l3);
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-top: 2px solid var(--ask-accent);
   border-radius: 12px;
   background: var(--dsw-alias-bg-layer-3);
   color: var(--dsw-alias-label-primary);
@@ -30,7 +31,7 @@
 .documentHeading { display: flex; align-items: flex-start; gap: 8px; }
 .documentIcon { flex: none; width: 18px; height: 20px; color: var(--dsw-alias-label-tertiary); }
 .title, .description { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
-.title { margin: 0; font-size: 14px; font-weight: 500; line-height: 20px; }
+.title { margin: 0; font-size: 15px; font-weight: 500; line-height: 20px; }
 .description { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; margin: 8px 0 0; color: var(--dsw-alias-label-secondary); font-size: 13px; line-height: 20px; }
 .footer { display: flex; align-items: center; justify-content: flex-end; flex-shrink: 0; flex-wrap: wrap; gap: 12px; padding: 8px 16px; border-top: 0.5px solid var(--dsw-alias-border-l2); }
 .feedback { flex: 1; min-width: 0; color: var(--dsw-alias-state-error-primary); font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }

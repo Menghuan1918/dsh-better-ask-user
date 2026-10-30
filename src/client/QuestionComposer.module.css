@@ -14,7 +14,8 @@
   max-height: min(75vh, 640px);
   max-height: min(75dvh, 640px);
   overflow: hidden;
-  border: 0.5px solid var(--dsw-alias-border-l3);
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-top: 2px solid var(--ask-accent);
   border-radius: 12px;
   background: var(--dsw-alias-bg-layer-3);
   color: var(--dsw-alias-label-primary);
@@ -28,7 +29,7 @@
 .header { display: flex; align-items: flex-start; justify-content: space-between; flex-shrink: 0; gap: 12px; padding: 16px 16px 12px; }
 .headingBlock { flex: 1; min-width: 0; }
 .eyebrow { margin-bottom: 4px; color: var(--dsw-alias-label-tertiary); font-size: 12px; line-height: 18px; }
-.title { margin: 0; max-height: 24vh; max-height: 24dvh; overflow-y: auto; font-size: 14px; line-height: 20px; font-weight: 500; }
+.title { margin: 0; max-height: 24vh; max-height: 24dvh; overflow-y: auto; font-size: 15px; line-height: 20px; font-weight: 500; }
 .title, .eyebrow, .optionLabel, .description, .detail { min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
 .title > div, .eyebrow > div, .optionLabel > div, .description > div { margin: 0; }
 /* Host compact Markdown retains the surrounding label's typography. */
@@ -48,7 +49,7 @@
 .option, .customRow { display: flex; align-items: flex-start; flex-shrink: 0; gap: 8px; width: 100%; min-height: 36px; padding: 8px; border: 0.5px solid transparent; border-radius: 8px; transition: background-color 100ms ease, border-color 100ms ease; }
 .option { background: transparent; color: inherit; text-align: left; cursor: pointer; font: inherit; }
 .option:hover:not(:disabled), .customRow:hover { background: var(--dsw-alias-interactive-bg-hover); }
-.optionSelected, .optionSelected:hover:not(:disabled), .customRowActive { border-color: color-mix(in srgb, var(--ask-accent) 22%, var(--dsw-alias-border-l2)); background: color-mix(in srgb, var(--ask-accent) 7%, transparent); }
+.optionSelected, .optionSelected:hover:not(:disabled), .customRowActive { border-color: color-mix(in srgb, var(--ask-accent) 38%, var(--dsw-alias-border-l2)); background: color-mix(in srgb, var(--ask-accent) 7%, transparent); }
 .option:active:not(:disabled) { background: color-mix(in srgb, var(--ask-accent) 13%, transparent); }
 .optionCopy { display: grid; gap: 4px; min-width: 0; flex: 1; }
 .optionLine { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; }

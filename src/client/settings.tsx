@@ -168,10 +168,16 @@ export function SettingsPage({ form, t = fallbackT }: { form?: any; t?: (key: Se
 
   const unlimited = live.questionTimeoutSeconds === '-1'
   const controlsDisabled = !writable || busy
+  const clock = (() => {
+    if (unlimited) return '∞'
+    const value = Number(live.questionTimeoutSeconds)
+    if (!Number.isSafeInteger(value) || value < 1) return '—'
+    return value < 60 ? value + 's' : Math.floor(value / 60) + ':' + String(value % 60).padStart(2, '0')
+  })()
 
   return (
     <div className={css.cfg} aria-busy={busy}>
-      <h2 className={css.title} id="better-ask-user-title">{t('title')}</h2>
+      <div className={css.pageHead}><h2 className={css.title} id="better-ask-user-title">{t('title')}</h2><span className={css.clockChip} data-unlimited={unlimited} aria-hidden="true">{clock}</span></div>
       {writable ? null : <p className={css.note} role="status">{t('readonly')}</p>}
       <section className={css.group} aria-label={t('title')}>
         <div className={css.waitSection}>
@@ -212,6 +218,11 @@ export function SettingsPage({ form, t = fallbackT }: { form?: any; t?: (key: Se
             </div>
           </div>}
           <p className={css.dependency} id="better-ask-user-wait-hint">{t(unlimited ? 'unlimitedHint' : 'waitHint')}</p>
+          <div className={css.timeline} aria-hidden="true">
+            <span className={css.timelineLabel}>{t('waitLabel')}</span>
+            <span className={css.timelineRail}><span className={css.timelineValue}>{clock}</span></span>
+            <span className={css.timelineLabel}>{t(unlimited ? 'unlimited' : 'timeoutTitle')}</span>
+          </div>
         </div>
         <div className={css.timeoutSection}>
           <h3 className={css.sectionTitle}>{t('timeoutTitle')}</h3>
