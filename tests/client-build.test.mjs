@@ -104,3 +104,41 @@ test('takeTime hard-stops the countdown and bump cannot revive it', () => {
   assert.equal(h.rejected, undefined)
   h.pending.close()
 })
+test('css modules build: file-scoped names, no cross-file collisions, valid svg xmlns', async () => {
+  const styleTags = []
+  const hadDocument = Object.prototype.hasOwnProperty.call(globalThis, 'document')
+  const prevDocument = globalThis.document
+  try {
+    globalThis.document = {
+      querySelector: () => null,
+      createElement: () => ({ dataset: {} }),
+      head: { appendChild: (tag) => styleTags.push(tag) },
+    }
+    entry.factory(fakeRequire)
+  } finally {
+    if (hadDocument) globalThis.document = prevDocument
+    else delete globalThis.document
+  }
+  assert.equal(styleTags.length, 6, 'every css module injects its own style tag')
+  const owners = new Map()
+  for (const style of styleTags) {
+    const css = style.textContent.replace(/\/\*[\s\S]*?\*\//g, '')
+    const selectors = new Set([...css.matchAll(/\.([A-Za-z_][A-Za-z0-9_-]*)/g)].map(match => match[1]))
+    assert.ok(selectors.size > 0)
+    for (const selector of selectors) {
+      assert.equal(owners.has(selector), false, selector + ' leaks across modules')
+      owners.set(selector, style.dataset.pluginCss)
+    }
+  }
+  const css = styleTags.map((tag) => tag.textContent).join('\n')
+  for (const scoped of ['QuestionComposer_card', 'PlanReviewPanel_card', 'AskHistoryRow_row', 'QuestionReplyView_bubble', 'QuestionWaitBar_bar', 'settings_choiceGroup', 'settings_choice', 'settings_sectionTitle']) {
+    assert.match(css, new RegExp('\\.' + scoped + '[ ,{]'), scoped + ' must be scoped per source file')
+  }
+  assert.doesNotMatch(css, /bau-/, 'no naive prefix rewriting may remain')
+  // Selects now use their native arrow; keep the parser regression with a URI fixture.
+  const builder = await readFile(new URL('../scripts/build-client.mjs', import.meta.url), 'utf8')
+  assert.match(builder, /'\.css': 'local-css'/, 'production CSS must use the native parser')
+  const { transform } = await import('esbuild')
+  const uri = await transform(".uri { background: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E\"); }", { loader: 'local-css' })
+  assert.match(uri.code, /xmlns='http:\/\/www\.w3\.org\/2000\/svg'/, 'svg data URI xmlns must stay intact')
+})

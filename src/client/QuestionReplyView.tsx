@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
@@ -31,15 +31,19 @@ export function QuestionReplyBubble({ data, t }: { data: QuestionReplyData; t: P
   const label = t('reply.label')
   const [open, setOpen] = useState(false)
   const toggleLabel = t(open ? 'reply.close' : 'reply.open')
-  const summary = data.questions.map(question => replyAnswerValues(data, question.id)).flat().join(', ')
+  const summary = data.questions.length === 0
+    ? data.text
+    : data.questions.flatMap(question => replyAnswerValues(data, question.id)).join(', ')
   const copyText = replyClipboardText(data, t)
   const [copied, setCopied] = useState(false)
+  const copyTimer = useRef<ReturnType<typeof setTimeout>>()
+  useEffect(() => () => { window.clearTimeout(copyTimer.current) }, [])
   const onCopy = useCallback(() => {
     if (copied) return
     void writeClipboard(copyText).then((ok) => {
       if (!ok) return
       setCopied(true)
-      window.setTimeout(() => { setCopied(false) }, 1000)
+      copyTimer.current = window.setTimeout(() => { setCopied(false) }, 1000)
     })
   }, [copied, copyText])
   return (
@@ -76,7 +80,12 @@ export function QuestionReplyBubble({ data, t }: { data: QuestionReplyData; t: P
                       {question.detail && <span className={css.detail}>{question.detail}</span>}
                       {question.options && question.options.length > 0 && (
                         <ul className={css.options}>
-                          {question.options.map(option => <li key={option.label}>{option.label}{option.description && ` — ${option.description}`}</li>)}
+                          {question.options.map(option => (
+                            <li key={option.label} data-selected={values.includes(option.label) || undefined}>
+                              <span className={css.selection} aria-hidden="true">{values.includes(option.label) ? <IconCheckOutlineRegular size={12} /> : null}</span>
+                              <span className={css.optionCopy}><span>{option.label}</span>{option.description && <span className={css.optionDescription}>{option.description}</span>}</span>
+                            </li>
+                          ))}
                         </ul>
                       )}
                     </dt>

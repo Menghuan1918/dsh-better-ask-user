@@ -12,6 +12,7 @@ import { planReviewOf, type QuestionAnswer, type QuestionCardSnapshot, type Ques
 import type { PendingQuestion } from './contract/slots.ts'
 import type { QuestionDraftAnswer, QuestionDraftProgress } from './draft-store.ts'
 import { PlanReviewPanel } from './PlanReviewPanel.tsx'
+import { QuestionWaitBar } from './QuestionWaitBar.tsx'
 import css from './QuestionComposer.module.css'
 
 /**
@@ -75,6 +76,8 @@ interface AnswerFieldProps {
   value: string
   /** Empty-field prompt. */
   placeholder: string
+  /** The visible question that labels this answer. */
+  labelledBy: string
   /** Whether a submission in flight has frozen the field. */
   disabled: boolean
   /** Whether this field takes focus on mount. */
@@ -114,6 +117,7 @@ function AnswerField(props: AnswerFieldProps) {
         disabled={props.disabled}
         rows={1}
         placeholder={props.placeholder}
+        aria-labelledby={props.labelledBy}
         onFocus={props.onFocus}
         onChange={props.onChange}
         onKeyDown={props.onKeyDown}
@@ -150,7 +154,7 @@ export function QuestionComposer(props: QuestionComposerProps) {
         actions={props.actions}
       />
     )
-    : <PlanReviewPanel key={question.key} pending={question} review={review} t={props.t} renderSlot={props.renderSlot} />
+    : <PlanReviewPanel key={question.key} pending={question} review={review} t={props.t} renderSlot={props.renderSlot} useQuestionCard={props.useQuestionCard} />
 }
 
 type QuestionFlowProps =
@@ -243,6 +247,7 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
   // oxlint-disable-next-line typescript/no-non-null-assertion
   const draft = drafts[index]!
   const hasOptions = (question.options?.length ?? 0) > 0
+  const questionId = `question-${pending.key}-${String(index)}`
 
   const replaceProgress = (nextIndex: number, nextDrafts: QuestionDraftAnswer[]): void => {
     // Every real answer input (option click, text edit, page navigation, skip)
@@ -427,18 +432,19 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
     <div className={css.frame} data-question-key={pending.key}>
       <section
         className={clsx(css.card, minimized && css.cardMinimized)}
-        aria-labelledby={`question-${pending.key}-${String(index)}`}
+        aria-labelledby={questionId}
+        aria-busy={busy !== null}
       >
         <header className={css.header}>
           <div className={css.headingBlock}>
-            {question.header !== undefined && (
+            {question.header !== undefined && question.header.trim() !== question.question.trim() && (
               <div className={css.eyebrow}>
                 <MarkdownText text={question.header} variant="compact" labels={markdownLabels} />
               </div>
             )}
             <div
               className={css.title}
-              id={`question-${pending.key}-${String(index)}`}
+              id={questionId}
               role="heading"
               aria-level={2}
             >
@@ -446,30 +452,6 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
             </div>
           </div>
           <div className={css.headerActions}>
-            {countdown !== undefined && card.waitState !== 'waiting' && card.waitState !== 'editing' && card.waitState !== 'continued' && (
-              <span className={css.waitStatus}>
-                {t(countdown.running ? 'wait.countdown' : 'wait.paused', {
-                  seconds: Math.ceil(countdown.remainingMs / 1000),
-                })}
-              </span>
-            )}
-            {countdown !== undefined && card.waitState !== 'waiting' && card.waitState !== 'editing' && card.waitState !== 'continued' && (
-              <span className={css.waitStatus}>
-                {t(card.timeoutMode === 'default' ? 'wait.auto' : 'wait.extend')}
-              </span>
-            )}
-            {countdown !== undefined && card.waitState !== 'waiting' && card.waitState !== 'editing' && card.waitState !== 'continued' && (
-              <Button variant="outline" className={css.waitButton} onClick={takeTime}>
-                {t('wait.takeTime')}
-              </Button>
-            )}
-            {card.state === 'continued' && <span className={css.waitStatus}>{t('wait.continued')}</span>}
-            {/* A held or frozen countdown says so; a request that never carried
-                one waits silently, as the blocking question always has. */}
-            {countdown !== undefined && (card.waitState === 'waiting' || card.waitState === 'editing') && (
-              <span className={css.waitStatus}>{t('wait.held')}</span>
-            )}
-            {review !== undefined && <span className={css.waitStatus}>{t('review.status')}</span>}
             <button
               type="button" className={css.iconButton}
               aria-label={t(minimized ? 'nav.maximize' : 'nav.minimize')}
@@ -490,6 +472,8 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
             </button>
           </div>
         </header>
+        <QuestionWaitBar card={card} t={t} busy={busy !== null} onTakeTime={takeTime} />
+        {review !== undefined && <div className={css.reviewStatus}>{t('review.status')}</div>}
 
         {!minimized && (
           <>
@@ -503,24 +487,20 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
               {question.detail !== undefined && (
                 <div className={css.detail}><MarkdownText text={question.detail} labels={markdownLabels} /></div>
               )}
-              <div className={css.options} role={question.multiSelect === true ? 'group' : 'radiogroup'}>
+              <div className={css.options} role={hasOptions && question.multiSelect !== true ? 'radiogroup' : 'group'} aria-labelledby={questionId}>
                 {(question.options ?? []).map((option, optionIndex) => {
                   const selected = draft.selected.includes(option.label)
                   const display = parseRecommendedLabel(option.label)
                   return (
                     <button
                       type="button" key={`${option.label}-${String(optionIndex)}`}
-                      className={clsx(css.option, selected && question.multiSelect !== true && css.optionSelected)}
+                      className={clsx(css.option, selected && css.optionSelected)}
                       role={question.multiSelect === true ? 'checkbox' : 'radio'}
                       aria-checked={selected}
-                      aria-label={display.label}
+                      aria-label={display.recommended ? `${display.label}, ${t('option.recommended')}` : display.label}
+                      aria-describedby={option.description === undefined ? undefined : `${questionId}-option-${String(optionIndex)}`}
                       disabled={locked}
                       onClick={() => { choose(option.label) }}
-                      onKeyDown={(event) => {
-                        if (event.key !== 'Enter') return
-                        event.preventDefault()
-                        submitDrafts(drafts)
-                      }}
                     >
                       {question.multiSelect === true
                         ? (
@@ -528,7 +508,7 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
                             {selected && <IconCheckOutlineRegular size={12} />}
                           </span>
                         )
-                        : <span className={css.number}>{optionIndex + 1}</span>}
+                        : <span className={clsx(css.radio, selected && css.radioChecked)} aria-hidden="true" />}
                       <span className={css.optionCopy}>
                         <span className={css.optionLine}>
                           <span className={css.optionLabel}>
@@ -537,12 +517,12 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
                           {display.recommended && (
                             <span className={css.badge}>{t('option.recommended')}</span>
                           )}
-                          {option.description !== undefined && (
-                            <span className={css.description}>
-                              <MarkdownText text={option.description} variant="compact" labels={markdownLabels} />
-                            </span>
-                          )}
                         </span>
+                        {option.description !== undefined && (
+                          <span className={css.description} id={`${questionId}-option-${String(optionIndex)}`}>
+                            <MarkdownText text={option.description} variant="compact" labels={markdownLabels} />
+                          </span>
+                        )}
                       </span>
                     </button>
                   )
@@ -561,7 +541,6 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
                       className={clsx(
                         css.customRow,
                         draft.custom !== '' && css.customRowActive,
-                        question.multiSelect !== true && draft.selected.length > 0 && css.customRowYielded,
                       )}
                     >
                       {question.multiSelect === true
@@ -574,7 +553,7 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
                           </span>
                         )
                         : (
-                          <span className={css.number} aria-hidden="true">
+                          <span className={css.customIcon} aria-hidden="true">
                             <IconEditOutlineRegular size={12} />
                           </span>
                         )}
@@ -583,6 +562,7 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
                         value={draft.custom}
                         disabled={locked}
                         placeholder={t('custom.placeholder')}
+                        labelledBy={questionId}
                         onChange={draftCustom}
                         onKeyDown={continueFromCustom}
                       />
@@ -597,6 +577,7 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
                       value={draft.custom}
                       disabled={locked}
                       placeholder={t('custom.placeholder')}
+                      labelledBy={questionId}
                       onFocus={() => { focusedQuestions.current.add(index) }}
                       onChange={draftCustom}
                       onKeyDown={continueFromCustom}
@@ -606,24 +587,26 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
             </div>
 
             <footer className={css.footer}>
-              <div className={css.pager}>
-                <button
-                  type="button" className={css.iconButton} aria-label={t('nav.prev')}
-                  disabled={index === 0 || busy !== null}
-                  onClick={() => { replaceProgress(index - 1, drafts); setError(null) }}
-                >
-                  <IconChevronLeftOutlineRegular />
-                </button>
-                <span className={css.progress}>{index + 1} / {questions.length}</span>
-                <button
-                  type="button" className={css.iconButton} aria-label={t('nav.next')}
-                  disabled={index === questions.length - 1 || busy !== null}
-                  onClick={() => { replaceProgress(index + 1, drafts); setError(null) }}
-                >
-                  <IconChevronRightOutlineRegular />
-                </button>
-              </div>
-              <div className={css.feedback} role="status">
+              {questions.length > 1 && (
+                <div className={css.pager}>
+                  <button
+                    type="button" className={css.iconButton} aria-label={t('nav.prev')}
+                    disabled={index === 0 || busy !== null}
+                    onClick={() => { replaceProgress(index - 1, drafts); setError(null) }}
+                  >
+                    <IconChevronLeftOutlineRegular />
+                  </button>
+                  <span className={css.progress}>{index + 1} / {questions.length}</span>
+                  <button
+                    type="button" className={css.iconButton} aria-label={t('nav.next')}
+                    disabled={index === questions.length - 1 || busy !== null}
+                    onClick={() => { replaceProgress(index + 1, drafts); setError(null) }}
+                  >
+                    <IconChevronRightOutlineRegular />
+                  </button>
+                </div>
+              )}
+              <div className={css.feedback} role="status" aria-atomic="true">
                 {error === null ? null : 'key' in error ? t(error.key) : error.text}
               </div>
               {/* A review card has nothing to send: the pager alone walks the record. */}
@@ -633,7 +616,7 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
                     {t('action.skip')}
                   </Button>
                   <Button
-                    variant="primary"
+                    variant="primary" className={css.primaryButton}
                     disabled={busy !== null || !answered(draft) || (index === questions.length - 1 && !canSubmit)}
                     onClick={continueFlow}
                   >

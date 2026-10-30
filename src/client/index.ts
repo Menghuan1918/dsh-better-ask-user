@@ -453,4 +453,4 @@ export function apply(ctx: ClientContext): void {
 }
 
 // Exported for the built-closure behavior tests; the client loader ignores it.
-export { PendingQuestion }
+export { PendingQuestion, SettingsEntry }

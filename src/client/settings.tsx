@@ -1,7 +1,9 @@
 /** Row configuration page: question wait and timeout behavior. */
 import { useCallback, useState } from 'react'
+import { Button } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SettingsKey } from './settings-locales.ts'
 import { settingsEn } from './settings-locales.ts'
+import css from './settings.module.css'
 
 const DEFAULTS = { questionTimeoutSeconds: 120, timeoutBehavior: 'native', goalTimeoutBehavior: 'native' } as const
 const MAX_QUESTION_TIMEOUT_SECONDS = 2147483
@@ -63,11 +65,35 @@ function parseDraft(draft: Draft): ConfigValue | undefined {
   return { questionTimeoutSeconds: seconds, timeoutBehavior: draft.timeoutBehavior, goalTimeoutBehavior: draft.goalTimeoutBehavior }
 }
 
-const fieldStyle = { display: 'grid', gap: 6, marginBottom: 18 } as const
-const labelStyle = { fontWeight: 600, fontSize: 13 } as const
-const hintStyle = { margin: 0, fontSize: 12, opacity: 0.65, lineHeight: 1.45 } as const
-const inputStyle = { maxWidth: 320, padding: '7px 9px', borderRadius: 8, border: '1px solid rgba(127,127,127,.35)', background: 'transparent', color: 'inherit', font: 'inherit' } as const
-const statusStyle = { fontSize: 12, lineHeight: 1.5 } as const
+/** Native radios retain the browser's arrow-key and focus behavior. */
+function ChoiceGroup({ id, label, value, options, disabled, hint, onChange }: {
+  id: string; label: string; value: string; options: Array<{ value: string; label: string }>;
+  disabled: boolean; hint: string; onChange: (value: string) => void
+}) {
+  return (
+    <fieldset className={css.choiceGroup} id={id} disabled={disabled} aria-describedby={hint}>
+      <legend className={css.rowTitle}>{label}</legend>
+      <div className={css.choices}>
+        {options.map(option => (
+          <label className={css.choice} key={option.value}>
+            <input
+              className={css.choiceInput}
+              id={`${id}-${option.value}`}
+              type="radio"
+              name={id}
+              value={option.value}
+              checked={value === option.value}
+              disabled={disabled}
+              aria-describedby={hint}
+              onChange={() => onChange(option.value)}
+            />
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  )
+}
 
 /** Page body, rendered inside the settings host's row config page. */
 export function SettingsPage({ form, t = fallbackT }: { form?: any; t?: (key: SettingsKey) => string }) {
@@ -77,6 +103,7 @@ export function SettingsPage({ form, t = fallbackT }: { form?: any; t?: (key: Se
   const base = host === null ? null : toDraft(host)
   const [draft, setDraft] = useState<DraftState | null>(null)
   const [busy, setBusy] = useState(false)
+  const [timedSeconds, setTimedSeconds] = useState(String(DEFAULTS.questionTimeoutSeconds))
   const [notice, setNotice] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
 
   const live = draft !== null && draft.revision === revision ? draft.value : base
@@ -121,95 +148,128 @@ export function SettingsPage({ form, t = fallbackT }: { form?: any; t?: (key: Se
   }, [busy, dirty, form, host, parsed, revision, t, writable])
 
   if (state === undefined) {
-    return <div style={{ padding: 4 }}><p style={statusStyle}>{t('waiting')}</p></div>
+    return <div className={css.cfg}><p className={css.note} role="status">{t('waiting')}</p></div>
   }
   if (state.status === 'loading') {
-    return <div style={{ padding: 4 }}><p style={statusStyle}>{t('loading')}</p></div>
+    return <div className={css.cfg}><p className={css.note} role="status">{t('loading')}</p></div>
   }
   if (host === null || live === null) {
-    return <div style={{ padding: 4 }}><p style={statusStyle}>{t('unavailable')}</p></div>
+    return <div className={css.cfg}><p className={css.note} role="alert">{t('unavailable')}</p></div>
   }
 
   const invalid = parsed === undefined
   const status = notice !== null
-    ? <span style={{ ...statusStyle, color: notice.tone === 'ok' ? '#2f8f4e' : '#c0392b' }}>{notice.text}</span>
+    ? <span className={`${css.status} ${notice.tone === 'ok' ? css.statusOk : css.statusError}`} role={notice.tone === 'error' ? 'alert' : 'status'}>{notice.text}</span>
     : invalid
-      ? <span style={{ ...statusStyle, color: '#c0392b' }}>{t('invalidWait')}</span>
+      ? <span className={`${css.status} ${css.statusError}`} id="better-ask-user-error" role="alert">{t('invalidWait')}</span>
       : dirty
-        ? <span style={statusStyle}>{t('dirty')}</span>
+        ? <span className={css.status} role="status">{t('dirty')}</span>
         : null
 
+  const unlimited = live.questionTimeoutSeconds === '-1'
+  const controlsDisabled = !writable || busy
+
   return (
-    <div style={{ padding: '4px 2px', maxWidth: 720 }}>
-      <h3 style={{ margin: '0 0 6px', fontSize: 16 }}>{t('title')}</h3>
-      <p style={{ ...hintStyle, marginBottom: 18 }}>{t('intro')}</p>
-      {writable ? null : <p style={{ ...statusStyle, marginBottom: 14 }}>{t('readonly')}</p>}
+    <div className={css.cfg} aria-busy={busy}>
+      <h2 className={css.title} id="better-ask-user-title">{t('title')}</h2>
+      {writable ? null : <p className={css.note} role="status">{t('readonly')}</p>}
+      <section className={css.group} aria-label={t('title')}>
+        <div className={css.waitSection}>
+          <ChoiceGroup
+            id="better-ask-user-wait-mode"
+            label={t('waitLabel')}
+            value={unlimited ? 'unlimited' : 'timed'}
+            options={[{ value: 'timed', label: t('timed') }, { value: 'unlimited', label: t('unlimited') }]}
+            disabled={controlsDisabled}
+            hint="better-ask-user-wait-hint"
+            onChange={(value) => {
+              const nextUnlimited = value === 'unlimited'
+              if (nextUnlimited && !invalid) setTimedSeconds(live.questionTimeoutSeconds)
+              edit(current => ({ ...current, questionTimeoutSeconds: nextUnlimited ? '-1' : timedSeconds }))
+            }}
+          />
+          {unlimited ? null : <div className={css.duration}>
+            <label htmlFor="better-ask-user-wait">{t('durationLabel')}</label>
+            <div className={css.durationControl}>
+              <input
+                id="better-ask-user-wait"
+                className={css.input}
+                aria-describedby={invalid ? 'better-ask-user-error' : 'better-ask-user-wait-hint'}
+                type="number"
+                min={1}
+                max={MAX_QUESTION_TIMEOUT_SECONDS}
+                step={1}
+                inputMode="numeric"
+                aria-invalid={invalid || undefined}
+                value={live.questionTimeoutSeconds}
+                disabled={controlsDisabled}
+                onChange={(event) => {
+                  const next = event.target.value
+                  edit(current => ({ ...current, questionTimeoutSeconds: next }))
+                }}
+              />
+              <span className={css.unit}>{t('seconds')}</span>
+            </div>
+          </div>}
+          <p className={css.dependency} id="better-ask-user-wait-hint">{t(unlimited ? 'unlimitedHint' : 'waitHint')}</p>
+        </div>
+        <div className={css.timeoutSection}>
+          <h3 className={css.sectionTitle}>{t('timeoutTitle')}</h3>
+          <div className={css.timeoutChoices}>
+            <ChoiceGroup
+              id="better-ask-user-behavior"
+              label={t('behaviorLabel')}
+              value={live.timeoutBehavior}
+              options={[{ value: 'native', label: t('native') }, { value: 'default', label: t('default') }]}
+              disabled={controlsDisabled || unlimited}
+              hint="better-ask-user-timeout-hint"
+              onChange={(value) => {
+                const next = value === 'default' ? 'default' : 'native'
+                edit(current => ({ ...current, timeoutBehavior: next }))
+              }}
+            />
+            <ChoiceGroup
+              id="better-ask-user-goal-behavior"
+              label={t('goalBehaviorLabel')}
+              value={live.goalTimeoutBehavior}
+              options={[{ value: 'native', label: t('native') }, { value: 'default', label: t('default') }]}
+              disabled={controlsDisabled || unlimited}
+              hint="better-ask-user-timeout-hint"
+              onChange={(value) => {
+                const next = value === 'default' ? 'default' : 'native'
+                edit(current => ({ ...current, goalTimeoutBehavior: next }))
+              }}
+            />
+          </div>
+          <p className={css.dependency} id="better-ask-user-timeout-hint">
+            {t(unlimited ? 'timeoutDisabled' : live.timeoutBehavior === 'default' || live.goalTimeoutBehavior === 'default' ? 'defaultHint' : 'nativeHint')}
+          </p>
+        </div>
+      </section>
 
-      <div style={fieldStyle}>
-        <label style={labelStyle} htmlFor="better-ask-user-wait">{t('waitLabel')}</label>
-        <input
-          id="better-ask-user-wait"
-          type="number"
-          min={-1}
-          max={MAX_QUESTION_TIMEOUT_SECONDS}
-          step={1}
-          style={inputStyle}
-          value={live.questionTimeoutSeconds}
-          disabled={!writable || busy}
-          onChange={(event) => {
-            const next = event.target.value
-            edit((current) => ({ ...current, questionTimeoutSeconds: next }))
-          }}
-        />
-        <p style={hintStyle}>{t('waitHint')}</p>
-      </div>
-
-      <div style={fieldStyle}>
-        <label style={labelStyle} htmlFor="better-ask-user-behavior">{t('behaviorLabel')}</label>
-        <select
-          id="better-ask-user-behavior"
-          style={inputStyle}
-          value={live.timeoutBehavior}
-          disabled={!writable || busy}
-          onChange={(event) => {
-            const next = event.target.value === 'default' ? 'default' : 'native'
-            edit((current) => ({ ...current, timeoutBehavior: next }))
+      <div className={css.footer} id="better-ask-user-settings-footer">
+        <div className={css.statusSlot}>{status}</div>
+        <Button
+          variant="outline"
+          className={css.discard}
+          id="better-ask-user-discard"
+          disabled={controlsDisabled || ((draft === null || draft.revision !== revision) && notice === null)}
+          onClick={() => {
+            setDraft(null)
+            setNotice(null)
+            setTimedSeconds(String(host.questionTimeoutSeconds === -1 ? DEFAULTS.questionTimeoutSeconds : host.questionTimeoutSeconds))
           }}
         >
-          <option value="native">{t('native')}</option>
-          <option value="default">{t('default')}</option>
-        </select>
-        <p style={hintStyle}>{t(live.timeoutBehavior === 'default' ? 'defaultHint' : 'nativeHint')}</p>
-      </div>
-
-      <div style={fieldStyle}>
-        <label style={labelStyle} htmlFor="better-ask-user-goal-behavior">{t('goalBehaviorLabel')}</label>
-        <select
-          id="better-ask-user-goal-behavior"
-          style={inputStyle}
-          value={live.goalTimeoutBehavior}
-          disabled={!writable || busy}
-          onChange={(event) => {
-            const next = event.target.value === 'default' ? 'default' : 'native'
-            edit((current) => ({ ...current, goalTimeoutBehavior: next }))
-          }}
-        >
-          <option value="native">{t('native')}</option>
-          <option value="default">{t('default')}</option>
-        </select>
-        <p style={hintStyle}>{t(live.goalTimeoutBehavior === 'default' ? 'defaultHint' : 'nativeHint')}</p>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <button
-          type="button"
+          {t('discard')}
+        </Button>
+        <Button
+          variant="primary"
+          className={css.button}
           disabled={!writable || busy || !dirty || invalid}
           onClick={() => { void save() }}
-          style={{ padding: '7px 16px', borderRadius: 8, border: '1px solid rgba(127,127,127,.35)', background: 'rgba(127,127,127,.12)', color: 'inherit', font: 'inherit', cursor: 'pointer' }}
         >
           {busy ? t('saving') : t('save')}
-        </button>
-        {status}
+        </Button>
       </div>
     </div>
   )

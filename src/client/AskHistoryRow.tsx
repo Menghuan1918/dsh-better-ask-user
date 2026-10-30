@@ -1,9 +1,8 @@
 /** History row for ask_user_question: compact summary plus a replay button. */
-import { IconQuestionOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronRightOutlineRegular, IconQuestionOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps, UserQuestionRecord } from '@deepseek-ai/dsh-client-ui-tool/client'
 import type { AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions/types'
-import type { QuestionKey } from './locales.ts'
 import css from './AskHistoryRow.module.css'
 
 type AskHistoryRowProps = ToolCallViewProps & PropsLocale<'question'> & {
@@ -48,6 +47,7 @@ function questionList(argsRaw: string): AskUserQuestionItem[] | undefined {
       id: candidate.id,
       question: candidate.question,
       ...(typeof candidate.header === 'string' ? { header: candidate.header } : {}),
+      ...(typeof candidate.detail === 'string' ? { detail: candidate.detail } : {}),
       ...(Array.isArray(candidate.options)
         ? {
             options: candidate.options.flatMap(option => isRecord(option) && typeof option.label === 'string'
@@ -58,7 +58,7 @@ function questionList(argsRaw: string): AskUserQuestionItem[] | undefined {
               : []),
           }
         : {}),
-      ...(typeof candidate.multi_select === 'boolean' ? { multi_select: candidate.multi_select } : {}),
+      ...(typeof candidate.multi_select === 'boolean' ? { multiSelect: candidate.multi_select } : {}),
     })
   }
   return questions
@@ -114,21 +114,15 @@ export function AskHistoryRow({
       ? () => { revealPanel(callId) }
       : undefined
 
-  return (
-    <div className={css.row}>
+  const content = (
+    <>
       <span className={css.icon} aria-hidden="true"><IconQuestionOutlineRegular /></span>
       <span className={css.title}>{t('history.title')}</span>
       <span className={css.summary} title={summary}>{summary}</span>
-      {action !== undefined && (
-        <button
-          type="button"
-          className={css.open}
-          onClick={action}
-          aria-label={review ? t('history.review') : t('history.reopen')}
-        >
-          {review ? t('history.review') : t('history.reopen')}
-        </button>
-      )}
-    </div>
+      {action !== undefined && <span className={css.open}>{review ? t('history.review') : t('history.reopen')}<IconChevronRightOutlineRegular size={14} /></span>}
+    </>
   )
+  return action === undefined
+    ? <div className={css.row} data-question-history={callId}>{content}</div>
+    : <button type="button" className={css.row} data-question-history={callId} data-history-action={review ? 'review' : 'open'} onClick={action} aria-label={review ? t('history.review') : t('history.reopen')}>{content}</button>
 }
