@@ -62,7 +62,7 @@ test('bundle registers the ask history row for top-level and nested calls', asyn
   assert.match(source, /history\.review/)
 })
 
-test('history row uses an icon exported by DSH 0.2.1 primitives', async () => {
+test('history row uses an icon exported by DSH next primitives', async () => {
   const source = await readFile(new URL('../lib/client.js', import.meta.url), 'utf8')
   assert.doesNotMatch(source, /IconQuestionOutline14/)
   assert.match(source, /IconQuestionOutlineRegular/)
@@ -131,7 +131,7 @@ test('css modules build: file-scoped names, no cross-file collisions, valid svg 
     }
   }
   const css = styleTags.map((tag) => tag.textContent).join('\n')
-  for (const scoped of ['QuestionComposer_card', 'PlanReviewPanel_card', 'AskHistoryRow_row', 'QuestionReplyView_bubble', 'QuestionWaitBar_bar', 'settings_choiceGroup', 'settings_choice', 'settings_sectionTitle']) {
+  for (const scoped of ['QuestionComposer_card', 'PlanReviewPanel_card', 'AskHistoryRow_row', 'QuestionReplyView_bubble', 'QuestionWaitBar_bar', 'settings_choices', 'settings_choice', 'settings_sectionLabel']) {
     assert.match(css, new RegExp('\\.' + scoped + '[ ,{]'), scoped + ' must be scoped per source file')
   }
   assert.doesNotMatch(css, /bau-/, 'no naive prefix rewriting may remain')

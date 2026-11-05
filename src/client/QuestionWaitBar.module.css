@@ -1,30 +1,50 @@
+/* Compact countdown strip: ring, tabular time, one ghost action. */
 .bar {
-  --ask-accent: #3388BB;
+  --ui-accent: #3388bb;
+  --ui-accent-text: #14587f;
+  --ui-ink-1: var(--dsw-alias-label-primary, #0f1115);
+  --ui-ink-2: var(--dsw-alias-label-secondary, #61666b);
+  --ui-ink-3: var(--dsw-alias-label-tertiary, #81858c);
+  --ui-line-1: var(--dsw-alias-border-l1, #0000000a);
+  --ui-line-2: var(--dsw-alias-border-l2, #0000001a);
+  --ui-raised: var(--dsw-alias-bg-layer-2, #fff);
+  --ui-hover: var(--dsw-alias-interactive-bg-hover, color-mix(in srgb, var(--ui-ink-1) 5%, transparent));
   display: flex;
   align-items: center;
   flex-shrink: 0;
   gap: 8px;
+  min-width: 0;
   min-height: 36px;
-  margin: 0 16px 12px;
-  padding: 2px 4px 2px 8px;
-  border: 0.5px solid var(--dsw-alias-border-l2);
+  margin: 0 16px 10px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--ui-line-2);
   border-radius: 8px;
-  background: var(--dsw-alias-bg-layer-2);
-  color: var(--dsw-alias-label-primary);
+  background: var(--ui-raised);
+  color: var(--ui-ink-1);
 }
 .clock { position: relative; display: grid; place-items: center; width: 24px; height: 24px; flex: none; }
 .ring { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke-width: 2; transform: rotate(-90deg); }
-.track { stroke: var(--dsw-alias-border-l2); }
-.remaining { stroke: var(--ask-accent); }
-.clockHand { width: 8px; height: 9px; margin-top: -4px; margin-left: 5px; border-left: 1.5px solid var(--dsw-alias-label-secondary); border-bottom: 1.5px solid var(--dsw-alias-label-secondary); }
-.pause { width: 16px; height: 16px; color: var(--dsw-alias-label-secondary); }
-.status { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; min-width: 0; }
-.time { font-size: 12px; line-height: 20px; }
-.bar[data-wait-state='counting'] .time, .bar[data-wait-state='paused'] .time { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 13px; font-weight: 500; font-variant-numeric: tabular-nums; }
-.policy { color: var(--dsw-alias-label-secondary); font-size: 12px; line-height: 20px; }
-.takeTime { flex: none; margin-left: auto; min-height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: transparent; color: var(--dsw-alias-label-secondary); font: inherit; font-size: 12px; cursor: pointer; }
-.takeTime:hover:not(:disabled) { background: var(--dsw-alias-interactive-bg-hover); color: var(--dsw-alias-label-primary); }
-.takeTime:active:not(:disabled) { background: color-mix(in srgb, var(--ask-accent) 10%, transparent); }
-.takeTime:focus-visible { outline: 2px solid var(--ask-accent); outline-offset: 2px; }
+.track { stroke: var(--ui-line-2); }
+.remaining { stroke: var(--ui-accent); }
+.clockHand { width: 8px; height: 9px; margin-top: -4px; margin-left: 5px; border-left: 1.5px solid var(--ui-ink-2); border-bottom: 1.5px solid var(--ui-ink-2); }
+.pause { width: 16px; height: 16px; color: var(--ui-ink-2); }
+.status { display: flex; align-items: center; min-width: 0; }
+.time { color: var(--ui-ink-1); font-size: 12px; line-height: 20px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bar[data-wait-state='counting'] .time { font-weight: 500; }
+.takeTime { appearance: none; display: inline-flex; align-items: center; justify-content: center; flex: none; margin-left: auto; min-height: 28px; padding: 0 10px; border: 0; border-radius: 6px; background: transparent; color: var(--ui-ink-3); font: inherit; font-size: 12px; line-height: 18px; font-weight: 500; cursor: pointer; transition: background-color 140ms ease, color 140ms ease; }
+.takeTime:hover:not(:disabled) { background: var(--ui-hover); color: var(--ui-ink-1); }
+.takeTime:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
 .takeTime:disabled { opacity: .4; cursor: default; }
-@media (max-width: 720px) { .bar { gap: 8px; margin: 0 16px 12px; padding: 4px 8px; } .status { display: grid; gap: 0; } .takeTime { min-height: 44px; } }
+@media (max-width: 720px) {
+  .bar { margin: 0 12px 8px; padding: 4px 6px 4px 8px; }
+}
+@media (pointer: coarse) {
+  .takeTime { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .takeTime { transition: none; }
+}
+[data-ds-dark-theme] .bar {
+  --ui-accent: #4eb0e8;
+  --ui-accent-text: #6fc0ee;
+}

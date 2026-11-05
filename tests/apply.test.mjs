@@ -52,5 +52,5 @@ test('apply shadows ask_user_question per agent and registers the shared PTC exe
   assert.equal(registered[0].output.schema.oneOf[1].properties.autoSelected.type, 'boolean')
   assert.equal(registered[0].output.schema.oneOf[1].properties.warning.type, 'string')
   assert.deepEqual(ptcCalls, [['betterPtc'], 'ask_user_question'])
-  assert.deepEqual(events, ['agent/created', 'agent/disposed', 'system-prompt/assemble'])
+  assert.deepEqual(events, ['agent/created', 'agent/disposed'])
 })

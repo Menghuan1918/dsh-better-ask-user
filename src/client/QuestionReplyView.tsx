@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useId, useRef, useState } from 'react'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
@@ -35,17 +35,23 @@ export function QuestionReplyBubble({ data, t }: { data: QuestionReplyData; t: P
     ? data.text
     : data.questions.flatMap(question => replyAnswerValues(data, question.id)).join(', ')
   const copyText = replyClipboardText(data, t)
-  const [copied, setCopied] = useState(false)
+  const detailsId = useId()
+  const [copyState, setCopyState] = useState<'idle' | 'copying' | 'copied' | 'error'>('idle')
   const copyTimer = useRef<ReturnType<typeof setTimeout>>()
   useEffect(() => () => { window.clearTimeout(copyTimer.current) }, [])
-  const onCopy = useCallback(() => {
-    if (copied) return
-    void writeClipboard(copyText).then((ok) => {
-      if (!ok) return
-      setCopied(true)
-      copyTimer.current = window.setTimeout(() => { setCopied(false) }, 1000)
-    })
-  }, [copied, copyText])
+  const onCopy = useCallback(async () => {
+    if (copyState === 'copying' || copyState === 'copied') return
+    window.clearTimeout(copyTimer.current)
+    setCopyState('copying')
+    try {
+      const ok = await writeClipboard(copyText)
+      setCopyState(ok ? 'copied' : 'error')
+      if (ok) copyTimer.current = window.setTimeout(() => { setCopyState('idle') }, 1500)
+    } catch {
+      setCopyState('error')
+    }
+  }, [copyState, copyText])
+  const copyLabel = copyState === 'copied' ? t('copied') : t('copy')
   return (
     <div className={css.row} data-question-reply={data.callId} data-reply-outcome={data.outcome} role="group" aria-label={label}>
       <div className={css.bubble}>
@@ -53,6 +59,7 @@ export function QuestionReplyBubble({ data, t }: { data: QuestionReplyData; t: P
           type="button"
           className={css.toggle}
           aria-expanded={open}
+          aria-controls={open ? detailsId : undefined}
           aria-label={`${label} · ${toggleLabel}`}
           onClick={() => { setOpen(value => !value) }}
         >
@@ -67,9 +74,9 @@ export function QuestionReplyBubble({ data, t }: { data: QuestionReplyData; t: P
           {!open && <span className={css.summary}>{summary === '' ? t('reply.skipped') : summary}</span>}
         </button>
         {open && (data.questions.length === 0
-          ? <p className={css.text}>{data.text}</p>
+          ? <p className={css.text} id={detailsId}>{data.text}</p>
           : (
-            <dl className={css.details}>
+            <dl className={css.details} id={detailsId}>
               {data.questions.map((question) => {
                 const values = replyAnswerValues(data, question.id)
                 return (
@@ -103,11 +110,14 @@ export function QuestionReplyBubble({ data, t }: { data: QuestionReplyData; t: P
         <span className={css.time}>
           {new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hour12: false }).format(data.time)}
         </span>
-        <Tooltip label={copied ? t('copied') : t('copy')} side="bottom">
-          <button type="button" className={css.action} aria-label={copied ? t('copied') : t('copy')} onClick={onCopy}>
-            {copied ? <IconCheckOutlineRegular /> : <IconCopyOutlineRegular />}
+        <Tooltip label={copyLabel} side="bottom">
+          <button type="button" className={css.action} aria-label={copyLabel} aria-busy={copyState === 'copying'} disabled={copyState === 'copying'} onClick={() => { void onCopy() }}>
+            {copyState === 'copying' ? <span className={css.spinner} aria-hidden="true" /> : copyState === 'copied' ? <IconCheckOutlineRegular /> : <IconCopyOutlineRegular />}
           </button>
         </Tooltip>
+        <span className={css.copyFeedback} role={copyState === 'error' ? 'alert' : 'status'}>
+          {copyState === 'error' ? t('reply.copyFailed') : copyState === 'copied' ? t('copied') : null}
+        </span>
       </div>
     </div>
   )

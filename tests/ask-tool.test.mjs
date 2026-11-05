@@ -82,7 +82,10 @@ test('input contract keeps official fields and exposes optional detail', () => {
   assert.equal(harness.definition.description, base.description)
   assert.equal(harness.definition.parameters.properties.questions.items.properties.detail.type, 'string')
   assert.equal(base.parameters.properties.questions.items.properties.detail, undefined, 'base schema must not be mutated')
-  assert.equal(harness.definition.parameters.properties.timeout, undefined)
+  assert.equal(harness.definition.parameters.properties.timeout.type, 'integer')
+  assert.match(harness.definition.parameters.properties.timeout.description, /omit.*plugin setting/)
+  assert.ok(!harness.definition.parameters.required?.includes('timeout'))
+  assert.equal(base.parameters.properties.timeout, undefined, 'base schema must not be mutated')
   assert.equal(harness.definition.output.schema.oneOf[0].properties.autoSelected.type, 'boolean')
   assert.equal(harness.definition.output.schema.oneOf[0].properties.warning.type, 'string')
   assert.equal(harness.definition.output.schema.oneOf[1].properties.pending.type, 'boolean')
@@ -107,9 +110,9 @@ test('question detail is forwarded and validated as a string', async () => {
   )
 })
 
-test('native behavior forwards the plugin wait and returns the official pending shape', async () => {
+test('native behavior forwards the plugin wait, not the compatibility marker, and returns the official pending shape', async () => {
   const harness = makeHarness()
-  const result = await harness.definition.execute(args, harness.exec)
+  const result = await harness.definition.execute({ ...args, timeout: -1 }, harness.exec)
   assert.equal(result.pending, true)
   assert.match(result.message, /No answer batch arrived/)
   assert.equal(harness.calls.timed.length, 1)

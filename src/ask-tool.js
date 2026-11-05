@@ -1,5 +1,6 @@
 /** ask_user_question scope shadow: official contract plus the plugin-managed wait. */
 import { ToolArgsError, validateJsonSchemaValue } from '@deepseek-ai/dsh-tools'
+import { TIMED_WAIT_PARAMETER } from '@deepseek-ai/dsh-user-questions'
 import { buildDefaultAnswer } from './default-answer.js'
 
 /** Model-visible notice for the native pending result. */
@@ -44,10 +45,15 @@ function answerResult(result) {
   }
 }
 
-/** Add the optional detail field to the model-visible question schema. */
+/** Add detail and the next host marker used to replay pending questions. */
 function parametersWithDetail(parameters) {
   if (parameters === undefined) return parameters
   const next = structuredClone(parameters)
+  // DSH classifies logged ask calls by this schema key, not by askTimed usage.
+  next.properties[TIMED_WAIT_PARAMETER] = {
+    type: 'integer',
+    description: 'Host continuation marker; omit. The plugin setting, not this argument, controls foreground wait duration.',
+  }
   const properties = next?.properties?.questions?.items?.properties
   if (properties !== undefined && properties.detail === undefined) {
     properties.detail = {

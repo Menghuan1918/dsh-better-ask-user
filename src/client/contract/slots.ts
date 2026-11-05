@@ -281,6 +281,7 @@ export class PendingQuestion {
   readonly #siblings: (() => readonly string[]) | undefined
   readonly #listeners = new Set<() => void>()
   #snapshot: QuestionCardSnapshot
+  readonly #requiresDecision: boolean
   #waitMs: number | undefined
   #timeoutMode: 'native' | 'default' = 'native'
   #defaultAnswer: QuestionAnswer | undefined
@@ -302,6 +303,9 @@ export class PendingQuestion {
   ) {
     this.sessionId = sessionId
     this.questions = questions
+    // Intent, not presentation narrowing: a multi-question plan review still needs a human decision.
+    this.#requiresDecision = questions.some(question =>
+      question.intent?.kind === 'plan-review' || question.intent?.kind === 'approval')
     this.#waitMs = settings?.waitMs
     this.#timeoutMode = settings?.timeoutMode ?? 'native'
     this.#defaultAnswer = settings?.defaultAnswer
@@ -341,6 +345,14 @@ export class PendingQuestion {
   readonly subscribe = (listener: () => void): (() => void) => {
     this.#listeners.add(listener)
     return () => { this.#listeners.delete(listener) }
+  }
+
+  /** Apply timing policy when the forwarded request arrives after its projection created the card. */
+  configure(settings: BetterAskConfig): void {
+    this.#waitMs = settings.waitMs
+    this.#timeoutMode = settings.timeoutMode ?? 'native'
+    this.#defaultAnswer = settings.defaultAnswer
+    this.publish()
   }
 
   /** Read the stable current card state. */
@@ -414,11 +426,12 @@ export class PendingQuestion {
    */
   attachWaterfall(channel: QuestionWaterfallChannel): void {
     this.#waterfall = channel
-    this.#timedWait = channel.deadline !== undefined
+    const deadline = this.#requiresDecision ? undefined : channel.deadline
+    this.#timedWait = deadline !== undefined
     if (!this.#held && !this.#engaged) {
-      this.#deadline = channel.deadline
-      if (this.#focused && channel.deadline !== undefined) {
-        this.#remainingMs = Math.max(0, channel.deadline - Date.now())
+      this.#deadline = deadline
+      if (this.#focused && deadline !== undefined) {
+        this.#remainingMs = Math.max(0, deadline - Date.now())
         this.#deadline = undefined
       }
     }
@@ -538,6 +551,7 @@ export class PendingQuestion {
 
   /** Settle with the host-authored default answer in default timeout mode. */
   autoSelect(): void {
+    if (this.#requiresDecision) return
     if (this.#held || this.#engaged || this.#focused) return
     const channel = this.#waterfall
     if (channel === undefined) return
@@ -555,6 +569,7 @@ export class PendingQuestion {
 
   /** Local countdown reached zero: default-select or settle with `ASK_TIMED_OUT`. */
   timeout(): void {
+    if (this.#requiresDecision) return
     if (this.#held || this.#engaged || this.#focused) return
     if (this.#timeoutMode === 'default' && this.#defaultAnswer !== undefined) {
       this.autoSelect()

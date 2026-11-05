@@ -32,8 +32,6 @@ export function QuestionWaitBar({ card, t, busy, onTakeTime }: {
       </span>
       <div className={css.status} role={held || continued ? 'status' : undefined} aria-atomic="true">
         <span className={css.time} aria-label={status}>{held || continued ? status : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`}</span>
-        {!held && !continued && !running && <span className={css.policy}>{t('wait.pauseLabel')}</span>}
-        {!held && !continued && <span className={css.policy}>{t(card.timeoutMode === 'default' ? 'wait.auto' : 'wait.extend')}</span>}
       </div>
       {!held && !continued && <button type="button" className={css.takeTime} disabled={busy} onClick={onTakeTime}>{t('wait.takeTime')}</button>}
     </div>

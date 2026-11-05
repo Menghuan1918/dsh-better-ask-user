@@ -16,9 +16,7 @@ export function apply(ctx, config = {}) {
 
   const states = new Map()
 
-  function refresh(state) {
-    state.askDispose?.()
-    state.askDispose = undefined
+  function register(state) {
     const tools = state.actor.get('tools')
     const base = tools.get('ask_user_question', state.agent)
     if (base === undefined) return
@@ -29,7 +27,7 @@ export function apply(ctx, config = {}) {
     if (states.has(agent)) return states.get(agent)
     const state = { agent, actor: agent.ctx, askDispose: undefined }
     states.set(agent, state)
-    refresh(state)
+    register(state)
     return state
   }
 
@@ -43,16 +41,6 @@ export function apply(ctx, config = {}) {
     const state = states.get(agent)
     if (state !== undefined) cleanup(state)
     states.delete(agent)
-  })
-  ctx.on('system-prompt/assemble', (assembly, context, next) => {
-    const state = states.get(context.scope)
-    if (state === undefined) return next()
-    refresh(state)
-    const schema = state.actor.get('tools').schemas(state.agent).find(tool => tool.name === 'ask_user_question')
-    if (schema !== undefined) {
-      assembly.tools = assembly.tools.map(tool => tool.name === 'ask_user_question' ? schema : tool)
-    }
-    return next()
   })
   for (const agent of ctx.agents.list()) setup(agent)
   ctx.effect(() => () => {

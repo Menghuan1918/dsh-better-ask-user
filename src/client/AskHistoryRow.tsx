@@ -1,4 +1,5 @@
 /** History row for ask_user_question: compact summary plus a replay button. */
+import { useState } from 'react'
 import { IconChevronRightOutlineRegular, IconQuestionOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps, UserQuestionRecord } from '@deepseek-ai/dsh-client-ui-tool/client'
@@ -99,6 +100,7 @@ export function AskHistoryRow({
   reviewPanel,
   t,
 }: AskHistoryRowProps): React.JSX.Element {
+  const [failedAction, setFailedAction] = useState<string | null>(null)
   const argsRaw = 'kind' in block ? block.call?.argsRaw ?? '' : block.argsRaw
   const output = 'kind' in block ? resultText(block.content) : undefined
   const questions = questionList(argsRaw)
@@ -109,20 +111,30 @@ export function AskHistoryRow({
   const summary = questions?.[0]?.question.split('\n').find(line => line.trim() !== '')?.trim() ?? t('history.title')
   const review = record !== undefined
   const action = review
-    ? () => { reviewPanel(callId, record) }
+    ? () => reviewPanel(callId, record)
     : isPending(output) || phase === 'start'
-      ? () => { revealPanel(callId) }
+      ? () => revealPanel(callId)
       : undefined
+
+  const actionKey = `${callId}-${review ? 'review' : 'open'}`
 
   const content = (
     <>
       <span className={css.icon} aria-hidden="true"><IconQuestionOutlineRegular /></span>
-      <span className={css.title}>{t('history.title')}</span>
       <span className={css.summary} title={summary}>{summary}</span>
       {action !== undefined && <span className={css.open}>{review ? t('history.review') : t('history.reopen')}<IconChevronRightOutlineRegular size={14} /></span>}
     </>
   )
-  return action === undefined
-    ? <div className={css.row} data-question-history={callId}>{content}</div>
-    : <button type="button" className={css.row} data-question-history={callId} data-history-action={review ? 'review' : 'open'} onClick={action} aria-label={review ? t('history.review') : t('history.reopen')}>{content}</button>
+  return (
+    <div className={css.frame} role="group" aria-label={t('history.title')}>
+      {action === undefined
+        ? <div className={css.row} data-question-history={callId}>{content}</div>
+        : <button
+            type="button" className={css.row} data-question-history={callId} data-history-action={review ? 'review' : 'open'}
+            onClick={() => { setFailedAction(action() ? null : actionKey) }}
+            aria-label={`${review ? t('history.review') : t('history.reopen')} · ${summary}`}
+          >{content}</button>}
+      {failedAction === actionKey && <span className={css.error} role="alert">{t('history.unavailable')}</span>}
+    </div>
+  )
 }

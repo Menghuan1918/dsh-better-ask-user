@@ -99,11 +99,17 @@ export function PlanReviewPanel({ pending, review, t, renderSlot, useQuestionCar
         </div>
         <QuestionWaitBar card={card} t={t} busy={busy} onTakeTime={() => { pending.takeTime() }} />
         <div className={css.summary} data-plan-document>
-          <div className={css.documentHeading}><svg className={css.documentIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 12h6M9 16h6" /></svg><h3 className={css.title}>{summary.title}</h3></div>
+          <div className={css.documentHeading}>
+            <svg className={css.documentIcon} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8zM14 3v5h5M9 12h6M9 16h6" /></svg>
+            <h3 className={css.title}>{summary.title}</h3>
+          </div>
           {summary.description !== '' && <p className={css.description}>{summary.description}</p>}
         </div>
         <div className={css.footer} data-plan-decision>
-          <div className={css.feedback} role="status" aria-atomic="true">{error}</div>
+          <div className={css.feedback} role={error === null ? 'status' : 'alert'} aria-atomic="true" data-error={error !== null || undefined}>
+            {busy && <span className={css.spinner} aria-hidden="true" />}
+            {error ?? (busy ? t('submitting') : null)}
+          </div>
           <div className={css.actions}>
             {decline !== undefined && (
               <button
@@ -121,7 +127,7 @@ export function PlanReviewPanel({ pending, review, t, renderSlot, useQuestionCar
               {t('plan.discuss')}
             </Button>
             <Button
-              variant="primary" className={css.primaryButton} {...tooltip(review.approve.description)}
+              variant="primary" className={css.primary} {...tooltip(review.approve.description)}
               aria-describedby={review.approve.description === undefined ? undefined : `plan-approve-${pending.key}`}
               disabled={busy || !canDecide} onClick={() => { decide(review.approve.label) }}
             >

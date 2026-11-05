@@ -42,6 +42,7 @@ export function parseRecommendedLabel(label: string): { label: string; recommend
 
 /** Only a marked first choice is an implicit draft; the user still submits it. */
 function recommendedFirstOption(question: PendingQuestion['questions'][number]): string | undefined {
+  if (question.intent?.kind === 'approval' || question.intent?.kind === 'plan-review') return undefined
   const label = question.options?.[0]?.label
   return label !== undefined && parseRecommendedLabel(label).recommended ? label : undefined
 }
@@ -200,7 +201,7 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
   const [busy, setBusy] = useState<'answer' | 'cancel' | null>(null)
   const [error, setError] = useState<Feedback | null>(null)
   const card = useQuestionCard(pending.key, snapshot => snapshot ?? REMOVED_CARD)
-  const canSubmit = card.channel !== 'none'
+  const canSubmit = !card.closed && card.channel !== 'none'
   // The answer surface freezes while a submission is in flight, and for good on
   // a review card: its call has already settled.
   const locked = busy !== null || review !== undefined
@@ -240,13 +241,14 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
   // collapsed question must not steal focus from the expand toggle back into
   // the input, so focus is granted once per question index.
   const focusedQuestions = useRef(new Set<number>())
-  const answerSurface = useRef<HTMLDivElement>(null)
+  const answerSurface = useRef<HTMLElement>(null)
   // Every navigation write stays in bounds and drafts mirrors questions 1:1.
   // oxlint-disable-next-line typescript/no-non-null-assertion
   const question = questions[index]!
   // oxlint-disable-next-line typescript/no-non-null-assertion
   const draft = drafts[index]!
   const hasOptions = (question.options?.length ?? 0) > 0
+  const fixedActions = question.intent?.kind === 'approval'
   const questionId = `question-${pending.key}-${String(index)}`
 
   const replaceProgress = (nextIndex: number, nextDrafts: QuestionDraftAnswer[]): void => {
@@ -267,11 +269,11 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
     replaceProgress(index, drafts)
   }
 
-  const focusAnswerSurface = (event: FocusEvent<HTMLDivElement>): void => {
+  const focusAnswerSurface = (event: FocusEvent<HTMLElement>): void => {
     if (!event.currentTarget.contains(event.relatedTarget)) pending.holdFocus()
   }
 
-  const blurAnswerSurface = (event: FocusEvent<HTMLDivElement>): void => {
+  const blurAnswerSurface = (event: FocusEvent<HTMLElement>): void => {
     if (!event.currentTarget.contains(event.relatedTarget)) pending.releaseFocus()
   }
 
@@ -323,7 +325,7 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
     setError(null)
   }
 
-  const choose = (label: string): void => {
+  const choose = (label: string, advance = true): void => {
     updateDraft((current) => {
       if (question.multiSelect === true) {
         const selected = current.selected.includes(label)
@@ -332,7 +334,23 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
         return { ...current, selected, skipped: false }
       }
       return { selected: [label], custom: '', skipped: false }
-    }, question.multiSelect !== true && index < questions.length - 1 ? index + 1 : index)
+    }, advance && question.multiSelect !== true && index < questions.length - 1 ? index + 1 : index)
+  }
+
+  const navigateOptions = (event: KeyboardEvent<HTMLButtonElement>, optionIndex: number): void => {
+    if (question.multiSelect === true || locked || event.defaultPrevented) return
+    const options = question.options ?? []
+    let next: number
+    if (event.key === 'ArrowDown' || event.key === 'ArrowRight') next = (optionIndex + 1) % options.length
+    else if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') next = (optionIndex - 1 + options.length) % options.length
+    else if (event.key === 'Home') next = 0
+    else if (event.key === 'End') next = options.length - 1
+    else return
+    event.preventDefault()
+    event.stopPropagation()
+    event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role="radio"]')[next]?.focus()
+    // Arrow navigation changes the choice without advancing to another question.
+    choose(options[next]!.label, false)
   }
 
   const answered = (item: QuestionDraftAnswer): boolean =>
@@ -411,7 +429,7 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
   }
 
   const continueFromCustom = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (event.key !== 'Enter' || event.shiftKey || isComposing(event)) return
+    if (event.defaultPrevented || event.repeat || event.key !== 'Enter' || event.shiftKey || isComposing(event)) return
     event.preventDefault()
     continueFlow()
   }
@@ -431,24 +449,31 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
   return (
     <div className={css.frame} data-question-key={pending.key}>
       <section
+        ref={answerSurface}
         className={clsx(css.card, minimized && css.cardMinimized)}
+        onFocusCapture={focusAnswerSurface}
+        onBlurCapture={blurAnswerSurface}
         aria-labelledby={questionId}
         aria-busy={busy !== null}
       >
         <header className={css.header}>
           <div className={css.headingBlock}>
-            {question.header !== undefined && question.header.trim() !== question.question.trim() && (
-              <div className={css.eyebrow}>
-                <MarkdownText text={question.header} variant="compact" labels={markdownLabels} />
+            <div className={css.titleRow}>
+              <div
+                className={css.title}
+                id={questionId}
+                role="heading"
+                aria-level={2}
+              >
+                <MarkdownText text={question.question} variant="compact" labels={markdownLabels} />
               </div>
-            )}
-            <div
-              className={css.title}
-              id={questionId}
-              role="heading"
-              aria-level={2}
-            >
-              <MarkdownText text={question.question} variant="compact" labels={markdownLabels} />
+              {question.header !== undefined && question.header.trim() !== question.question.trim()
+                && !question.question.toLocaleLowerCase().includes(question.header.trim().toLocaleLowerCase()) && (
+                <span className={css.headerChip}>
+                  <MarkdownText text={question.header} variant="compact" labels={markdownLabels} />
+                </span>
+              )}
+              {review !== undefined && <span className={css.statusChip}>{t('review.status')}</span>}
             </div>
           </div>
           <div className={css.headerActions}>
@@ -473,16 +498,12 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
           </div>
         </header>
         <QuestionWaitBar card={card} t={t} busy={busy !== null} onTakeTime={takeTime} />
-        {review !== undefined && <div className={css.reviewStatus}>{t('review.status')}</div>}
 
         {!minimized && (
           <>
             <div
-              ref={answerSurface}
               className={css.body}
               data-question-scroll
-              onFocusCapture={focusAnswerSurface}
-              onBlurCapture={blurAnswerSurface}
             >
               {question.detail !== undefined && (
                 <div className={css.detail}><MarkdownText text={question.detail} labels={markdownLabels} /></div>
@@ -500,6 +521,8 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
                       aria-label={display.recommended ? `${display.label}, ${t('option.recommended')}` : display.label}
                       aria-describedby={option.description === undefined ? undefined : `${questionId}-option-${String(optionIndex)}`}
                       disabled={locked}
+                      tabIndex={question.multiSelect === true || selected || (draft.selected.length === 0 && optionIndex === 0) ? 0 : -1}
+                      onKeyDown={(event) => { navigateOptions(event, optionIndex) }}
                       onClick={() => { choose(option.label) }}
                     >
                       {question.multiSelect === true
@@ -535,7 +558,7 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
                 {/* A review card keeps the free-text field only when the
                     recorded answer used it; an empty disabled box with a
                     placeholder would read as somewhere to type. */}
-                {(review === undefined || draft.custom !== '') && (hasOptions
+                {!fixedActions && (review === undefined || draft.custom !== '') && (hasOptions
                   ? (
                     <div
                       className={clsx(
@@ -606,20 +629,21 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
                   </button>
                 </div>
               )}
-              <div className={css.feedback} role="status" aria-atomic="true">
+              <div className={css.feedback} role="status" aria-atomic="true" data-error={error !== null && (!('key' in error) || error.key !== 'status.sent') || undefined}>
                 {error === null ? null : 'key' in error ? t(error.key) : error.text}
               </div>
               {/* A review card has nothing to send: the pager alone walks the record. */}
               {review === undefined && (
                 <div className={css.footerActions}>
-                  <Button variant="outline" disabled={busy !== null} onClick={skipQuestion}>
+                  {!fixedActions && <Button variant="outline" className={css.button} disabled={busy !== null} onClick={skipQuestion}>
                     {t('action.skip')}
-                  </Button>
+                  </Button>}
                   <Button
-                    variant="primary" className={css.primaryButton}
+                    variant="primary" className={css.primary} aria-busy={busy === 'answer'}
                     disabled={busy !== null || !answered(draft) || (index === questions.length - 1 && !canSubmit)}
                     onClick={continueFlow}
                   >
+                    {busy === 'answer' && <span className={css.spinner} aria-hidden="true" />}
                     {busy === 'answer'
                       ? t('submitting')
                       : index === questions.length - 1 ? t('submit') : t('action.next')}

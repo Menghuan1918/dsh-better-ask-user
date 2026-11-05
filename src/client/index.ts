@@ -117,7 +117,10 @@ class QuestionCards {
   ): QuestionCard {
     if (callId !== undefined) {
       const existing = this.byCallId(sessionId, callId)
-      if (existing !== undefined) return existing
+      if (existing !== undefined) {
+        if (settings !== undefined) existing.pending.configure(settings)
+        return existing
+      }
     }
     return this.#create(new PendingQuestion(sessionId, questions, callId, () => this.keysFor(sessionId), undefined, settings))
   }
@@ -419,10 +422,7 @@ export function apply(ctx: ClientContext): void {
     name: 'tool.call.toolview',
     key: 'ask_user_question',
     locale: NS,
-    // The shipped `@deepseek-ai/dsh-client-ui-tool` already registers
-    // `ask-question-toolview` for this key at priority 0, and the slot registry
-    // rejects a second entry at the same priority (which failed the whole client
-    // boot). A lower priority shadows it: lowest renders.
+    // The host already owns this key at priority 0; lower priority shadows it.
     priority: -1,
     inject: (sessionId: SessionId) => ({
       revealPanel: (callId: string) => ctx.get('userQuestionPanels')?.reveal(sessionId, callId) ?? false,

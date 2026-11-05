@@ -85,7 +85,7 @@ const text = (r) => {
   const read = (n) => (n == null ? '' : typeof n === 'string' ? n : (n.children ?? []).map(read).join(''))
   return read(r.toJSON())
 }
-const saveButton = (r) => r.root.findAll((n) => host(n) && n.type === 'button' && n.props?.['data-variant'] === 'primary')[0]
+const saveButton = (r) => r.root.findAll((n) => host(n) && n.type === 'button' && n.props?.['data-settings-save'] === true)[0]
 
 test('settings page: compact named section, labeled controls, defaults, a11y hints', async () => {
   const { renderer } = await mount()
@@ -96,19 +96,20 @@ test('settings page: compact named section, labeled controls, defaults, a11y hin
   assert.equal(renderer.root.findByType('section').props['aria-label'], 'title')
   for (const id of ['better-ask-user-wait-mode', 'better-ask-user-behavior', 'better-ask-user-goal-behavior']) {
     const group = byId(renderer, id)
-    assert.equal(group.type, 'fieldset')
-    assert.equal(group.findAllByType('legend').length, 1)
+    assert.equal(group.type, 'div')
+    assert.equal(group.props.role, 'radiogroup')
+    assert.equal(group.props['aria-labelledby'], id + '-label')
     const radios = group.findAllByType('input')
     assert.equal(radios.length, 2)
-    assert.ok(radios.every(node => node.props.type === 'radio' && node.props.name === id))
+    assert.ok(radios.every(node => node.props.type === 'radio' && node.props.name === radios[0].props.name))
     assert.equal(radios.filter(node => node.props.checked).length, 1)
   }
   assert.equal(byId(renderer, 'better-ask-user-wait').props.value, '120')
   assert.equal(byId(renderer, 'better-ask-user-wait').props['aria-describedby'], 'better-ask-user-wait-hint')
   assert.equal(byId(renderer, 'better-ask-user-behavior-native').props.checked, true)
   assert.equal(byId(renderer, 'better-ask-user-goal-behavior-native').props.checked, true)
-  assert.equal(saveButton(renderer).props.disabled, true)
-  assert.deepEqual(byId(renderer, 'better-ask-user-settings-footer').findAllByType('button').map(node => node.children.join('')), ['discard', 'save'])
+  assert.equal(saveButton(renderer), undefined)
+  assert.equal(byId(renderer, 'better-ask-user-settings-footer'), undefined)
   await act(async () => { renderer.unmount() })
 })
 
@@ -119,7 +120,7 @@ test('discard restores current host values and remembered duration without writi
   await act(async () => { byId(renderer, 'better-ask-user-discard').props.onClick() })
   assert.equal(byId(renderer, 'better-ask-user-wait').props.value, '300')
   assert.equal(byId(renderer, 'better-ask-user-behavior-default').props.checked, true)
-  assert.equal(saveButton(renderer).props.disabled, true)
+  assert.equal(saveButton(renderer), undefined)
   assert.doesNotMatch(text(renderer), /dirty/)
   await act(async () => { byId(renderer, 'better-ask-user-wait-mode-unlimited').props.onChange() })
   await act(async () => { byId(renderer, 'better-ask-user-wait-mode-timed').props.onChange() })
@@ -136,8 +137,8 @@ test('wait editing: 0 blocks save, unlimited mode saves -1 with one op', async (
   assert.equal(saveButton(renderer).props.disabled, true)
   await act(async () => { byId(renderer, 'better-ask-user-wait-mode-unlimited').props.onChange() })
   assert.equal(byId(renderer, 'better-ask-user-wait'), undefined)
-  assert.equal(byId(renderer, 'better-ask-user-behavior').props.disabled, true)
-  assert.equal(byId(renderer, 'better-ask-user-goal-behavior').props.disabled, true)
+  assert.equal(byId(renderer, 'better-ask-user-behavior'), undefined)
+  assert.equal(byId(renderer, 'better-ask-user-goal-behavior'), undefined)
   assert.equal(saveButton(renderer).props.disabled, false)
   await act(async () => { saveButton(renderer).props.onClick(); await Promise.resolve() })
   assert.deepEqual(controller.calls[0].ops, [{ op: 'set', path: ['questionTimeoutSeconds'], value: -1 }])
