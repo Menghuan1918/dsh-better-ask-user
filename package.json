@@ -1,11 +1,11 @@
 {
   "name": "dsh-better-ask-user",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Independent ask_user_question plugin: configurable wait, input-extended countdown, markdown/mobile card, native or default timeout behavior, and PTC deadline exemption.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Menghuan1918/dsh-better-ask-user.git"
+    "url": "git+https://github.com/omdsh-dev/dsh-better-ask-user.git"
   },
   "type": "module",
   "main": "src/index.js",
@@ -69,5 +69,13 @@
     "README.md",
     "LICENSE",
     "NOTICE"
-  ]
+  ],
+  "homepage": "https://github.com/omdsh-dev/dsh-better-ask-user#readme",
+  "bugs": {
+    "url": "https://github.com/omdsh-dev/dsh-better-ask-user/issues"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  }
 }

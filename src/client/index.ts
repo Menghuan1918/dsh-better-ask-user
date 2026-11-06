@@ -378,11 +378,12 @@ function publishContinuedQuestions(ctx: ClientContext, cards: QuestionCards): ()
  * @param ctx - client root context.
  */
 const SETTINGS_NS = 'better-ask-user-settings'
-// Standalone first, then the two Apollo-integration aliases. The Apollo profile
-// inserts the row from its bundle patch, so the Plugins page looks the page up
-// as '@menghuan1918/dsh-apollo#dsh-better-ask-user' (and the legacy alias).
+// Standalone first, then Better DSH and the legacy Apollo integration aliases.
+// The profile inserts the row from its bundle patch, so the Plugins page looks
+// the page up as '<declaring bundle>#dsh-better-ask-user'.
 const ROW_CONFIG_KEYS = Object.freeze([
   'dsh-better-ask-user#dsh-better-ask-user',
+  'dsh-better-dsh#dsh-better-ask-user',
   '@menghuan1918/dsh-apollo#dsh-better-ask-user',
   'dsh-apollo#dsh-better-ask-user',
 ])
